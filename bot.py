@@ -98,6 +98,42 @@ async def on_message(message):
 
     await bot.process_commands(message)
 
+@bot.event
+async def on_reaction_add(reaction, user):
+    print(f'[DEBUG] リアクションイベント発生')
+    print(f'[DEBUG] リアクション絵文字: {reaction.emoji}')
+    print(f'[DEBUG] リアクションしたユーザー: {user} (ID: {user.id})')
+    print(f'[DEBUG] メッセージチャンネル: {reaction.message.channel} (ID: {reaction.message.channel.id})')
+    print(f'[DEBUG] メッセージ内容: "{reaction.message.content}"')
+
+    # ボット自身のリアクションは無視
+    if user == bot.user:
+        print('[DEBUG] ボット自身のリアクションなのでスキップ')
+        return
+
+    # 指定されたチャンネルでのみ反応
+    ALLOWED_CHANNEL_ID = 1418467747083587607
+    if reaction.message.channel.id != ALLOWED_CHANNEL_ID:
+        print(f'[DEBUG] 許可されていないチャンネル ({reaction.message.channel.id}) からのリアクションなのでスキップ')
+        return
+
+    # グッドマーク（👍）リアクションに反応
+    if str(reaction.emoji) == '👍':
+        # 実行環境に応じて返信を変える
+        if os.path.exists('.env'):
+            response = 'グッドマークが押されたよ！ (ローカルから) 🏠'
+        else:
+            response = 'グッドマークが押されたよ！ (Railwayから) ☁️'
+
+        print(f'[DEBUG] グッドマーク検知、{response}と返信します')
+        try:
+            await reaction.message.channel.send(response)
+            print('[DEBUG] リアクション返信送信成功')
+        except Exception as e:
+            print(f'[DEBUG] リアクション返信送信エラー: {e}')
+    else:
+        print(f'[DEBUG] グッドマーク以外のリアクション ({reaction.emoji}) なので無視')
+
 if __name__ == '__main__':
     print('=== Discord Bot 起動中 ===')
     print(f'現在のディレクトリ: {os.getcwd()}')
