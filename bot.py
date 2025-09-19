@@ -66,13 +66,21 @@ async def on_message(message):
     print(f'[DEBUG] リプライ確認: {is_reply}')
 
     if (is_mentioned or is_reply) and message.content and not message.content.startswith('!'):
-        # 実行環境に応じて返信を変える
-        if os.path.exists('.env'):
-            response = 'こんにちは ハロー！(ローカルから) 🏠'
-        else:
-            response = 'こんにちは てへっ(Railwayから) ☁️'
+        # メッセージをオウム返しする
+        original_message = message.content
 
-        print(f'[DEBUG] 条件一致、{response}と返信します')
+        # メンションを除去してクリーンなメッセージを取得
+        clean_message = original_message
+        for mention in message.mentions:
+            clean_message = clean_message.replace(f'<@{mention.id}>', '').strip()
+
+        # 実行環境の情報を追加
+        if os.path.exists('.env'):
+            response = f'{clean_message} (ローカルから) 🏠'
+        else:
+            response = f'{clean_message} (Railwayから) ☁️'
+
+        print(f'[DEBUG] 条件一致、オウム返し: {response}')
         try:
             await message.channel.send(response)
             print('[DEBUG] 返信送信成功')
