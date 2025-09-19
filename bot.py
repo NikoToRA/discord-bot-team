@@ -58,7 +58,14 @@ async def on_message(message):
         print(f'[DEBUG] 許可されていないチャンネル ({message.channel.id}) からのメッセージなのでスキップ')
         return
 
-    if message.content and not message.content.startswith('!'):
+    # メンションまたはリプライの場合のみ反応
+    is_mentioned = bot.user in message.mentions
+    is_reply = message.reference and message.reference.message_id
+
+    print(f'[DEBUG] メンション確認: {is_mentioned}')
+    print(f'[DEBUG] リプライ確認: {is_reply}')
+
+    if (is_mentioned or is_reply) and message.content and not message.content.startswith('!'):
         # 実行環境に応じて返信を変える
         if os.path.exists('.env'):
             response = 'こんにちは ハロー！(ローカルから) 🏠'
@@ -72,7 +79,7 @@ async def on_message(message):
         except Exception as e:
             print(f'[DEBUG] 返信送信エラー: {e}')
     else:
-        print('[DEBUG] 条件不一致、返信しません')
+        print('[DEBUG] 条件不一致、返信しません（メンション/リプライなし）')
 
     await bot.process_commands(message)
 
