@@ -1,6 +1,6 @@
-# Discord Simple Bot
+# Discord Bot Team
 
-シンプルなDiscordボット - 任意のメッセージに「こんにちは」と返信します。
+Discordボットチーム用のベースボット - 任意のメッセージに「こんにちは」と返信します。
 
 ## 機能
 
