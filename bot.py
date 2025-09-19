@@ -21,7 +21,14 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 
 @bot.event
 async def on_ready():
+    # 実行環境の判定
+    if os.path.exists('.env'):
+        environment = "🏠 ローカル環境"
+    else:
+        environment = "☁️ Railway環境"
+
     print(f'{bot.user} でログインしました！')
+    print(f'実行環境: {environment}')
     print(f'ボットID: {bot.user.id}')
     print(f'サーバー数: {len(bot.guilds)}')
     for guild in bot.guilds:
@@ -46,9 +53,15 @@ async def on_message(message):
         return
 
     if message.content and not message.content.startswith('!'):
-        print('[DEBUG] 条件一致、こんにちはと返信します')
+        # 実行環境に応じて返信を変える
+        if os.path.exists('.env'):
+            response = 'こんにちは (ローカルから) 🏠'
+        else:
+            response = 'こんにちは (Railwayから) ☁️'
+
+        print(f'[DEBUG] 条件一致、{response}と返信します')
         try:
-            await message.channel.send('こんにちは')
+            await message.channel.send(response)
             print('[DEBUG] 返信送信成功')
         except Exception as e:
             print(f'[DEBUG] 返信送信エラー: {e}')
