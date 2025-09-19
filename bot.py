@@ -52,6 +52,12 @@ async def on_message(message):
         print('[DEBUG] ボット自身のメッセージなのでスキップ')
         return
 
+    # 指定されたチャンネルでのみ反応
+    ALLOWED_CHANNEL_ID = 1418467747083587607
+    if message.channel.id != ALLOWED_CHANNEL_ID:
+        print(f'[DEBUG] 許可されていないチャンネル ({message.channel.id}) からのメッセージなのでスキップ')
+        return
+
     if message.content and not message.content.startswith('!'):
         # 実行環境に応じて返信を変える
         if os.path.exists('.env'):
