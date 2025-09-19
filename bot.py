@@ -55,9 +55,9 @@ async def on_message(message):
     if message.content and not message.content.startswith('!'):
         # 実行環境に応じて返信を変える
         if os.path.exists('.env'):
-            response = 'こんにちは (ローカルから) 🏠'
+            response = 'こんにちは ハロー！(ローカルから) 🏠'
         else:
-            response = 'こんにちは (Railwayから) ☁️'
+            response = 'こんにちは てへっ(Railwayから) ☁️'
 
         print(f'[DEBUG] 条件一致、{response}と返信します')
         try:
