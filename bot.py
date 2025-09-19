@@ -14,8 +14,13 @@ handler = logging.StreamHandler()
 handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s'))
 discord_logger.addHandler(handler)
 
-intents = discord.Intents.default()
-intents.message_content = True
+intents = discord.Intents.all()
+# または個別に設定する場合:
+# intents = discord.Intents.default()
+# intents.message_content = True
+# intents.guilds = True
+# intents.guild_messages = True
+# intents.members = True
 
 bot = commands.Bot(command_prefix='!', intents=intents)
 
@@ -58,14 +63,16 @@ async def on_message(message):
         print(f'[DEBUG] 許可されていないチャンネル ({message.channel.id}) からのメッセージなのでスキップ')
         return
 
-    # メンションまたはリプライの場合のみ反応
+    # メンション、リプライ、または通常のメッセージで反応
     is_mentioned = bot.user in message.mentions
     is_reply = message.reference and message.reference.message_id
+    has_content = bool(message.content.strip())
 
     print(f'[DEBUG] メンション確認: {is_mentioned}')
     print(f'[DEBUG] リプライ確認: {is_reply}')
+    print(f'[DEBUG] メッセージ内容あり: {has_content}')
 
-    if (is_mentioned or is_reply) and message.content and not message.content.startswith('!'):
+    if has_content and not message.content.startswith('!'):
         # メッセージをオウム返しする
         original_message = message.content
 
@@ -87,7 +94,7 @@ async def on_message(message):
         except Exception as e:
             print(f'[DEBUG] 返信送信エラー: {e}')
     else:
-        print('[DEBUG] 条件不一致、返信しません（メンション/リプライなし）')
+        print('[DEBUG] 条件不一致、返信しません（メッセージ内容なしまたはコマンド）')
 
     await bot.process_commands(message)
 
