@@ -15,11 +15,16 @@ handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(me
 discord_logger.addHandler(handler)
 
 intents = discord.Intents.all()
+# リアクションイベント用の明示的な設定を追加
+intents.reactions = True
+intents.guild_reactions = True
 # または個別に設定する場合:
 # intents = discord.Intents.default()
 # intents.message_content = True
 # intents.guilds = True
 # intents.guild_messages = True
+# intents.reactions = True
+# intents.guild_reactions = True
 # intents.members = True
 
 bot = commands.Bot(command_prefix='!', intents=intents)
@@ -43,6 +48,8 @@ async def on_ready():
     print(f'message_content: {bot.intents.message_content}')
     print(f'guilds: {bot.intents.guilds}')
     print(f'guild_messages: {bot.intents.guild_messages}')
+    print(f'reactions: {bot.intents.reactions}')
+    print(f'guild_reactions: {bot.intents.guild_reactions}')
 
 @bot.event
 async def on_message(message):
