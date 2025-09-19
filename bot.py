@@ -58,9 +58,13 @@ async def on_message(message):
     await bot.process_commands(message)
 
 if __name__ == '__main__':
+    print('=== Discord Bot 起動中 ===')
+    print(f'現在のディレクトリ: {os.getcwd()}')
+    print(f'.envファイルの存在: {os.path.exists(".env")}')
     TOKEN = os.getenv('DISCORD_TOKEN')
     print(f'トークンの確認: {TOKEN[:10] if TOKEN else "None"}...')
     if TOKEN:
+        print('ボットを起動します...')
         bot.run(TOKEN)
     else:
         print('エラー: DISCORD_TOKENが設定されていません。.envファイルを確認してください。')
