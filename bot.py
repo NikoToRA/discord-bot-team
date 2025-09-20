@@ -4,6 +4,7 @@ import os
 import logging
 import datetime
 import asyncio
+import json
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -106,6 +107,109 @@ class RoomLogCollector:
 # ログコレクター初期化
 log_collector = RoomLogCollector(bot)
 
+# リアルタイムルームログクラス
+class RealtimeRoomLogger:
+    def __init__(self, room_id):
+        self.room_id = room_id
+        self.log_dir = os.getcwd()  # Railwayでは/app
+        self.log_file = os.path.join(self.log_dir, f"realtime_room_{room_id}_log.txt")
+        self.metadata_file = os.path.join(self.log_dir, f"realtime_room_{room_id}_metadata.json")
+        self.ensure_log_files()
+        
+    def ensure_log_files(self):
+        """ログファイルとメタデータファイルの存在確認・作成"""
+        if not os.path.exists(self.log_file):
+            with open(self.log_file, 'w', encoding='utf-8') as f:
+                f.write(f"=== Room {self.room_id} リアルタイムログ ===\n")
+                f.write(f"ログ開始: {datetime.datetime.now().strftime('%Y年%m月%d日 %H時%M分%S秒')}\n")
+                f.write("=" * 60 + "\n\n")
+                
+        if not os.path.exists(self.metadata_file):
+            metadata = {
+                "room_id": self.room_id,
+                "log_start_time": datetime.datetime.now().isoformat(),
+                "message_count": 0,
+                "last_updated": datetime.datetime.now().isoformat()
+            }
+            with open(self.metadata_file, 'w', encoding='utf-8') as f:
+                json.dump(metadata, f, indent=2, ensure_ascii=False)
+    
+    def append_message(self, message):
+        """新しいメッセージをログファイルに追記"""
+        try:
+            with open(self.log_file, 'a', encoding='utf-8') as f:
+                timestamp = message.created_at.strftime('%Y-%m-%d %H:%M:%S')
+                f.write(f"[{timestamp}] {message.author}\n")
+                
+                if message.content:
+                    f.write(f"内容: {message.content}\n")
+                if message.attachments:
+                    attachments = [att.url for att in message.attachments]
+                    f.write(f"添付ファイル: {', '.join(attachments)}\n")
+                if message.reactions:
+                    reactions = [f"{reaction.emoji}({reaction.count})" for reaction in message.reactions]
+                    f.write(f"リアクション: {', '.join(reactions)}\n")
+                    
+                f.write(f"メッセージID: {message.id}\n")
+                f.write("-" * 40 + "\n\n")
+                
+            self.update_metadata()
+            print(f'[REALTIME] メッセージをリアルタイムログに追記: {message.author} - {message.content[:50]}...')
+            
+        except Exception as e:
+            print(f'[ERROR] リアルタイムログ追記中にエラー: {e}')
+    
+    def update_metadata(self):
+        """メタデータファイルの更新"""
+        try:
+            if os.path.exists(self.metadata_file):
+                with open(self.metadata_file, 'r', encoding='utf-8') as f:
+                    metadata = json.load(f)
+            else:
+                metadata = {
+                    "room_id": self.room_id,
+                    "log_start_time": datetime.datetime.now().isoformat(),
+                    "message_count": 0
+                }
+                
+            metadata["message_count"] += 1
+            metadata["last_updated"] = datetime.datetime.now().isoformat()
+            
+            with open(self.metadata_file, 'w', encoding='utf-8') as f:
+                json.dump(metadata, f, indent=2, ensure_ascii=False)
+                
+        except Exception as e:
+            print(f'[ERROR] リアルタイムメタデータ更新中にエラー: {e}')
+    
+    def get_log_info(self):
+        """ログファイルの統計情報を取得"""
+        try:
+            if os.path.exists(self.metadata_file):
+                with open(self.metadata_file, 'r', encoding='utf-8') as f:
+                    metadata = json.load(f)
+                    
+                file_size = os.path.getsize(self.log_file) if os.path.exists(self.log_file) else 0
+                file_size_mb = file_size / (1024 * 1024)
+                
+                return {
+                    "message_count": metadata.get("message_count", 0),
+                    "log_start_time": metadata.get("log_start_time"),
+                    "last_updated": metadata.get("last_updated"),
+                    "file_size": file_size,
+                    "file_size_mb": file_size_mb,
+                    "file_path": self.log_file
+                }
+            else:
+                return None
+                
+        except Exception as e:
+            print(f'[ERROR] リアルタイムログ情報取得中にエラー: {e}')
+            return None
+
+# room1用リアルタイムロガー初期化
+REALTIME_TARGET_ROOM = 1418511738046779393
+realtime_logger = RealtimeRoomLogger(REALTIME_TARGET_ROOM)
+
 @bot.event
 async def on_ready():
     # 実行環境の判定
@@ -182,6 +286,11 @@ async def on_message(message):
 
     # すべてのチャンネルで反応（制限なし）
     print(f'[DEBUG] チャンネル {message.channel.name} (ID: {message.channel.id}) でメッセージ処理')
+    
+    # リアルタイムログ記録（room1のみ）
+    if message.channel.id == REALTIME_TARGET_ROOM:
+        realtime_logger.append_message(message)
+        print(f'[REALTIME] room1メッセージをリアルタイムログに記録')
 
     # メンション、リプライ、または通常のメッセージで反応
     is_mentioned = bot.user in message.mentions
@@ -343,6 +452,70 @@ async def on_raw_reaction_add(payload):
         finally:
             log_collector.is_collecting = False
             
+    # ハートマーク（❤️）リアクション - リアルタイムログダウンロード
+    elif str(payload.emoji) in ['❤️', '💖', '💕', '💗', '💓', '💝', '🧡', '💛', '💚', '💙', '💜', '🤍', '🖤', '🤎']:
+        # room1でのみ動作
+        if payload.channel_id == REALTIME_TARGET_ROOM:
+            print(f'[DEBUG] RAWイベントでハートマーク検知: {emoji_str}（リアルタイムログダウンロード）')
+            
+            try:
+                # ログ情報取得
+                log_info = realtime_logger.get_log_info()
+                if not log_info:
+                    await channel.send("❌ リアルタイムログ情報を取得できませんでした。")
+                    return
+                    
+                if not os.path.exists(realtime_logger.log_file):
+                    await channel.send("❌ リアルタイムログファイルが見つかりません。まずroom1でメッセージを投稿してください。")
+                    return
+                    
+                # ファイルサイズチェック
+                if log_info["file_size_mb"] > 8:
+                    await channel.send(f"⚠️ リアルタイムログファイルが大きすぎます ({log_info['file_size_mb']:.1f}MB)。")
+                    return
+                    
+                # Discordにアップロード
+                with open(realtime_logger.log_file, 'rb') as f:
+                    discord_file = discord.File(f, filename=f"realtime_room_{REALTIME_TARGET_ROOM}_log_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.txt")
+                    
+                    embed = discord.Embed(
+                        title="❤️ リアルタイムルームログ",
+                        description=f"**{channel.name}** のリアルタイムログファイル",
+                        color=0xff69b4
+                    )
+                    
+                    # ログ開始時間の表示
+                    if log_info["log_start_time"]:
+                        start_time = datetime.datetime.fromisoformat(log_info["log_start_time"])
+                        embed.add_field(
+                            name="📅 ログ開始", 
+                            value=start_time.strftime('%Y/%m/%d %H:%M:%S'), 
+                            inline=True
+                        )
+                    
+                    # 最終更新時間の表示
+                    if log_info["last_updated"]:
+                        last_updated = datetime.datetime.fromisoformat(log_info["last_updated"])
+                        embed.add_field(
+                            name="🔄 最終更新", 
+                            value=last_updated.strftime('%Y/%m/%d %H:%M:%S'), 
+                            inline=True
+                        )
+                        
+                    embed.add_field(name="📊 メッセージ数", value=f"{log_info['message_count']:,}件", inline=True)
+                    embed.add_field(name="📁 ファイルサイズ", value=f"{log_info['file_size_mb']:.2f}MB", inline=True)
+                    embed.add_field(name="⏰ ダウンロード時刻", value=datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S'), inline=True)
+                    embed.add_field(name="💡 説明", value="room1で投稿されたメッセージをリアルタイムで記録", inline=False)
+                    
+                    await channel.send("❤️ **リアルタイムログファイルをアップロードします！**", embed=embed, file=discord_file)
+                    print(f'[LOG] リアルタイムログファイルアップロード完了')
+                    
+            except Exception as e:
+                print(f'[ERROR] リアルタイムログファイルアップロード中にエラー: {e}')
+                await channel.send(f"❌ リアルタイムログファイルのアップロードに失敗しました: {str(e)}")
+        else:
+            print(f'[DEBUG] room1以外でのハートマークなので無視: {payload.channel_id}')
+            
     else:
         print(f'[DEBUG] RAWイベント: 対象外のリアクション ({emoji_str}) なので無視')
 
@@ -354,10 +527,11 @@ async def log_info(ctx):
         description="すべてのチャンネルで利用可能な機能",
         color=0x0099ff
     )
-    embed.add_field(name="💬 メッセージ機能", value="• ボットにメッセージを送る → オウム返し", inline=False)
-    embed.add_field(name="👍 リアクション機能", value="• 任意のメッセージに👍リアクション → そのチャンネルの全ログ収集", inline=False)
+    embed.add_field(name="💬 メッセージ機能", value="• ボットにメッセージを送る → オウム返し\n• room1でのメッセージ → リアルタイムログに記録", inline=False)
+    embed.add_field(name="👍 サムズアップ機能", value="• 任意のメッセージに👍リアクション → そのチャンネルの全ログ一括収集", inline=False)
+    embed.add_field(name="❤️ ハートマーク機能", value="• room1で❤️リアクション → リアルタイム蓄積ログをダウンロード", inline=False)
     embed.add_field(name="📊 ログ収集内容", value="• 投稿日時・投稿者・メッセージ内容\n• 添付ファイル・リアクション情報", inline=False)
-    embed.add_field(name="⚙️ 仕様", value="• 100件ごとに2秒休憩\n• 8MB以下でDiscordにアップロード\n• 全チャンネル対応・制限なし", inline=False)
+    embed.add_field(name="⚙️ 仕様", value="• 全ログ収集: 100件ごとに2秒休憩\n• リアルタイムログ: room1専用\n• 8MB以下でDiscordにアップロード", inline=False)
     
     await ctx.send(embed=embed)
 
