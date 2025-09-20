@@ -3,6 +3,7 @@ from discord.ext import commands
 import os
 import datetime
 import asyncio
+import csv
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -64,13 +65,16 @@ class GuildMemberCollector:
         return members_data, guild
     
     def save_members_to_file(self, members_data, guild):
-        """メンバー情報をテキストファイルに保存"""
+        """メンバー情報をテキストファイルとCSVファイルに保存"""
         timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
-        filename = f"guild_{guild.id}_members_{timestamp}.txt"
-        filepath = os.path.join("/Users/suguruhirayama/Desktop/AI実験室/Discordbot", filename)
+        txt_filename = f"guild_{guild.id}_members_{timestamp}.txt"
+        csv_filename = f"guild_{guild.id}_members_{timestamp}.csv"
+        txt_filepath = os.path.join("/Users/suguruhirayama/Desktop/AI実験室/Discordbot", txt_filename)
+        csv_filepath = os.path.join("/Users/suguruhirayama/Desktop/AI実験室/Discordbot", csv_filename)
         
         try:
-            with open(filepath, 'w', encoding='utf-8') as f:
+            # テキストファイル作成
+            with open(txt_filepath, 'w', encoding='utf-8') as f:
                 f.write(f"=== {guild.name} サーバーメンバー一覧 ===\n")
                 f.write(f"取得日時: {datetime.datetime.now().strftime('%Y年%m月%d日 %H時%M分%S秒')}\n")
                 f.write(f"総メンバー数: {len(members_data)}人\n")
@@ -116,9 +120,40 @@ class GuildMemberCollector:
                     sorted_roles = sorted(all_roles.items(), key=lambda x: x[1], reverse=True)
                     for role_name, count in sorted_roles:
                         f.write(f"{role_name}: {count}人\n")
+            
+            # CSVファイル作成
+            with open(csv_filepath, 'w', newline='', encoding='utf-8') as csvfile:
+                fieldnames = [
+                    'No', 'ユーザー名', '表示名', 'ユーザーID', 
+                    'アカウント作成日', 'サーバー参加日', 'ステータス', 
+                    'BOT', '最高ロール', 'ロール数', '全ロール', 
+                    'ブースト状況', 'ブースト開始日'
+                ]
+                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                
+                # ヘッダー行
+                writer.writeheader()
+                
+                # データ行
+                for i, member in enumerate(members_data, 1):
+                    writer.writerow({
+                        'No': i,
+                        'ユーザー名': member['username'],
+                        '表示名': member['display_name'],
+                        'ユーザーID': member['user_id'],
+                        'アカウント作成日': member['created_at'],
+                        'サーバー参加日': member['joined_at'],
+                        'ステータス': member['status'],
+                        'BOT': 'はい' if member['is_bot'] else 'いいえ',
+                        '最高ロール': member['top_role'],
+                        'ロール数': len(member['roles']),
+                        '全ロール': ', '.join(member['roles']) if member['roles'] else 'なし',
+                        'ブースト状況': 'あり' if member['premium_since'] != 'Not boosting' else 'なし',
+                        'ブースト開始日': member['premium_since'] if member['premium_since'] != 'Not boosting' else ''
+                    })
                     
-            print(f'[GUILD] ファイル保存完了: {filepath}')
-            return filepath
+            print(f'[GUILD] ファイル保存完了: {txt_filepath}, {csv_filepath}')
+            return (txt_filepath, csv_filepath)
             
         except Exception as e:
             print(f'[ERROR] ファイル保存中にエラー: {e}')
@@ -205,20 +240,30 @@ async def on_raw_reaction_add(payload):
             return
             
         # ファイル保存
-        filepath = member_collector.save_members_to_file(members_data, guild_info)
+        filepaths = member_collector.save_members_to_file(members_data, guild_info)
         
-        if filepath and os.path.exists(filepath):
-            # ファイルサイズ確認
-            file_size = os.path.getsize(filepath)
-            file_size_mb = file_size / (1024 * 1024)
+        if filepaths and all(os.path.exists(fp) for fp in filepaths):
+            txt_filepath, csv_filepath = filepaths
             
-            if file_size_mb > 8:  # Discordの8MB制限
-                await channel.send(f"⚠️ ファイルサイズが大きすぎます ({file_size_mb:.1f}MB)。\n"
-                                 f"ファイルはローカルに保存されました: `{filepath}`")
+            # ファイルサイズ確認
+            txt_size = os.path.getsize(txt_filepath)
+            csv_size = os.path.getsize(csv_filepath)
+            total_size_mb = (txt_size + csv_size) / (1024 * 1024)
+            
+            if total_size_mb > 8:  # Discordの8MB制限
+                await channel.send(f"⚠️ ファイルサイズが大きすぎます ({total_size_mb:.1f}MB)。\n"
+                                 f"ファイルはローカルに保存されました:\n"
+                                 f"TXT: `{txt_filepath}`\n"
+                                 f"CSV: `{csv_filepath}`")
             else:
-                # ファイルをDiscordにアップロード
-                with open(filepath, 'rb') as f:
-                    discord_file = discord.File(f, filename=os.path.basename(filepath))
+                # 複数ファイルをDiscordにアップロード
+                files_to_upload = []
+                
+                with open(txt_filepath, 'rb') as f:
+                    files_to_upload.append(discord.File(f, filename=os.path.basename(txt_filepath)))
+                    
+                with open(csv_filepath, 'rb') as f:
+                    files_to_upload.append(discord.File(f, filename=os.path.basename(csv_filepath)))
                     
                     embed = discord.Embed(
                         title="👁️ サーバーメンバー一覧",
@@ -231,16 +276,16 @@ async def on_raw_reaction_add(payload):
                     human_count = len(members_data) - bot_count
                     boosters = sum(1 for member in members_data if member['premium_since'] != 'Not boosting')
                     
-                    embed.add_field(name="📊 総メンバー数", value=f"{len(members_data):,}人", inline=True)
-                    embed.add_field(name="👥 人間", value=f"{human_count:,}人", inline=True)
-                    embed.add_field(name="🤖 BOT", value=f"{bot_count:,}人", inline=True)
-                    embed.add_field(name="💎 ブースター", value=f"{boosters:,}人", inline=True)
-                    embed.add_field(name="📁 ファイルサイズ", value=f"{file_size_mb:.2f}MB", inline=True)
-                    embed.add_field(name="⏰ 取得日時", value=datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S'), inline=True)
-                    
-                    embed.add_field(name="📋 ファイル内容", value="• ユーザー名・表示名・ID\n• 参加日・作成日・ステータス\n• ロール情報・ブースト状況\n• 統計情報・ロール統計", inline=False)
-                    
-                    await channel.send("👁️ **サーバーメンバー一覧ファイルをアップロードします！**", embed=embed, file=discord_file)
+                embed.add_field(name="📊 総メンバー数", value=f"{len(members_data):,}人", inline=True)
+                embed.add_field(name="👥 人間", value=f"{human_count:,}人", inline=True)
+                embed.add_field(name="🤖 BOT", value=f"{bot_count:,}人", inline=True)
+                embed.add_field(name="💎 ブースター", value=f"{boosters:,}人", inline=True)
+                embed.add_field(name="📁 TXTサイズ", value=f"{txt_size/(1024*1024):.2f}MB", inline=True)
+                embed.add_field(name="📊 CSVサイズ", value=f"{csv_size/(1024*1024):.2f}MB", inline=True)
+                embed.add_field(name="⏰ 取得日時", value=datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S'), inline=False)
+                embed.add_field(name="📋 ファイル形式", value="• TXT: 詳細情報＋統計\n• CSV: 表形式（Excel対応）", inline=False)
+                
+                await channel.send("👁️ **サーバーメンバー一覧ファイルをアップロードします！**", embed=embed, files=files_to_upload)
                     print(f'[LOG] メンバー一覧ファイルアップロード完了')
         else:
             await channel.send("❌ ファイルの保存に失敗しました。")
