@@ -125,9 +125,8 @@ async def on_ready():
         print('チャンネル一覧:')
         for channel in guild.text_channels:
             print(f'  - {channel.name} (ID: {channel.id})')
-            # 特定のチャンネルIDをチェック
-            if channel.id == 1418511738046779393:
-                print(f'    ★ room1チャンネル発見！（メッセージ・リアクション・ログ収集対象）')
+            # すべてのチャンネルで機能が利用可能
+            print(f'    ✅ 利用可能（メッセージ・リアクション・ログ収集）')
     print('Intents設定:')
     print(f'message_content: {bot.intents.message_content}')
     print(f'guilds: {bot.intents.guilds}')
@@ -181,11 +180,8 @@ async def on_message(message):
         print('[DEBUG] ボット自身のメッセージなのでスキップ')
         return
 
-    # 指定されたチャンネルでのみ反応
-    ALLOWED_CHANNEL_ID = 1418511738046779393  # room1
-    if message.channel.id != ALLOWED_CHANNEL_ID:
-        print(f'[DEBUG] 許可されていないチャンネル ({message.channel.id}) からのメッセージなのでスキップ')
-        return
+    # すべてのチャンネルで反応（制限なし）
+    print(f'[DEBUG] チャンネル {message.channel.name} (ID: {message.channel.id}) でメッセージ処理')
 
     # メンション、リプライ、または通常のメッセージで反応
     is_mentioned = bot.user in message.mentions
@@ -235,12 +231,8 @@ async def on_reaction_add(reaction, user):
         print('[DEBUG] ボット自身のリアクションなのでスキップ')
         return
 
-    # 指定されたチャンネルでのみ反応
-    ALLOWED_CHANNEL_ID = 1418511738046779393  # room1
-    if reaction.message.channel.id != ALLOWED_CHANNEL_ID:
-        print(f'[DEBUG] 許可されていないチャンネル ({reaction.message.channel.id}) からのリアクションなのでスキップ')
-        print(f'[DEBUG] 現在の許可チャンネルID: {ALLOWED_CHANNEL_ID}')
-        return
+    # すべてのチャンネルで反応（制限なし）
+    print(f'[DEBUG] チャンネル {reaction.message.channel.name} (ID: {reaction.message.channel.id}) でリアクション処理')
 
     # グッドマーク（👍）リアクションに反応（肌色のバリエーションも含む）
     thumbs_up_emojis = ['👍', '👍🏻', '👍🏼', '👍🏽', '👍🏾', '👍🏿']
@@ -283,12 +275,8 @@ async def on_raw_reaction_add(payload):
         print('[DEBUG] ボット自身のリアクションなのでスキップ')
         return
 
-    # 指定されたチャンネルでのみ反応
-    ALLOWED_CHANNEL_ID = 1418511738046779393  # room1
-    if payload.channel_id != ALLOWED_CHANNEL_ID:
-        print(f'[DEBUG] 許可されていないチャンネル ({payload.channel_id}) からのリアクションなのでスキップ')
-        print(f'[DEBUG] 現在の許可チャンネルID: {ALLOWED_CHANNEL_ID}')
-        return
+    # すべてのチャンネルで反応（制限なし）
+    print(f'[DEBUG] チャンネル {channel.name if channel else "不明"} (ID: {payload.channel_id}) でRAWリアクション処理')
 
     # リアクション種類による処理分岐
     emoji_str = str(payload.emoji)
@@ -362,14 +350,14 @@ async def on_raw_reaction_add(payload):
 async def log_info(ctx):
     """ログ収集機能の情報を表示"""
     embed = discord.Embed(
-        title="📋 ログ収集機能",
-        description="チャンネルのメッセージログを収集します",
+        title="🤖 ボット機能一覧",
+        description="すべてのチャンネルで利用可能な機能",
         color=0x0099ff
     )
-    embed.add_field(name="🔧 使用方法", value="任意のメッセージに 👍 リアクションを付ける", inline=False)
-    embed.add_field(name="📊 収集内容", value="• 投稿日時\n• 投稿者\n• メッセージ内容\n• 添付ファイル\n• リアクション", inline=False)
-    embed.add_field(name="⚙️ 仕様", value="• 100件ごとに2秒休憩\n• 8MB以下でDiscordにアップロード\n• それ以上はローカル保存", inline=False)
-    embed.add_field(name="📝 機能", value="👍 リアクション: そのチャンネルのログ収集", inline=False)
+    embed.add_field(name="💬 メッセージ機能", value="• ボットにメッセージを送る → オウム返し", inline=False)
+    embed.add_field(name="👍 リアクション機能", value="• 任意のメッセージに👍リアクション → そのチャンネルの全ログ収集", inline=False)
+    embed.add_field(name="📊 ログ収集内容", value="• 投稿日時・投稿者・メッセージ内容\n• 添付ファイル・リアクション情報", inline=False)
+    embed.add_field(name="⚙️ 仕様", value="• 100件ごとに2秒休憩\n• 8MB以下でDiscordにアップロード\n• 全チャンネル対応・制限なし", inline=False)
     
     await ctx.send(embed=embed)
 
