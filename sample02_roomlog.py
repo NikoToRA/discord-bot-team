@@ -186,7 +186,7 @@ async def on_raw_reaction_add(payload):
         print(f'[ERROR] チャンネル {payload.channel_id} が見つかりません')
         return
         
-    print(f'[LOG] グッドマーク検知！ログファイルをアップロード開始')
+    print(f'[LOG] ハートマーク検知！リアルタイムログファイルをアップロード開始')
     
     try:
         # ログ情報取得
@@ -274,7 +274,7 @@ async def log_status(ctx):
         last_updated = datetime.datetime.fromisoformat(log_info["last_updated"])
         embed.add_field(name="🔄 最終更新", value=last_updated.strftime('%Y/%m/%d %H:%M:%S'), inline=True)
         
-    embed.add_field(name="💡 使用方法", value="任意のメッセージに 👍 を付けるとログファイルをダウンロード", inline=False)
+    embed.add_field(name="💡 使用方法", value="任意のメッセージに ❤️ を付けるとログファイルをダウンロード", inline=False)
     
     await ctx.send(embed=embed)
 
@@ -289,7 +289,7 @@ async def roomlog_info(ctx):
     
     embed.add_field(name="📋 対象ルーム", value=f"<#{TARGET_ROOM_ID}>", inline=False)
     embed.add_field(name="⚡ リアルタイム記録", value="メッセージ投稿と同時にログファイルに自動追記", inline=False)
-    embed.add_field(name="👍 ログダウンロード", value="任意のメッセージに👍リアクション → ログファイルをアップロード", inline=False)
+    embed.add_field(name="❤️ ログダウンロード", value="任意のメッセージに❤️リアクション → ログファイルをアップロード", inline=False)
     embed.add_field(name="📊 コマンド", value="`!logstatus` - 現在のログ状況\n`!roomloginfo` - この説明", inline=False)
     embed.add_field(name="📁 ファイル形式", value="テキストファイル（UTF-8）\n8MB以下でDiscordにアップロード", inline=False)
     
