@@ -221,23 +221,33 @@ async def on_ready():
 @bot.event
 async def on_message(message):
     """特定チャンネルのメッセージにChatGPTで自動返答"""
+    print(f'[DEBUG] メッセージイベント発生: {message.channel.id} vs {TARGET_CHANNEL_ID}')
+    print(f'[DEBUG] 送信者: {message.author} (ID: {message.author.id})')
+    print(f'[DEBUG] ボット自身: {bot.user} (ID: {bot.user.id if bot.user else "None"})')
+    print(f'[DEBUG] メッセージ内容: "{message.content}"')
+    
     # ボット自身のメッセージは無視
     if message.author == bot.user:
+        print('[DEBUG] ボット自身のメッセージなのでスキップ')
         return
     
     # 対象チャンネル以外は無視
     if message.channel.id != TARGET_CHANNEL_ID:
+        print(f'[DEBUG] 対象外チャンネル ({message.channel.id}) なのでスキップ')
         return
     
     # 空のメッセージやコマンドは無視
     if not message.content.strip() or message.content.startswith('!'):
+        print(f'[DEBUG] 空メッセージまたはコマンドなのでスキップ: "{message.content}"')
         return
     
     print(f'[DEBUG] 対象チャンネルでメッセージ検出: {message.author} - {message.content[:50]}...')
     
     # ChatGPTが利用可能かチェック
     if not chatgpt_responder:
-        await message.reply("❌ ChatGPT機能が利用できません。OPENAI_API_KEYを設定してください。")
+        print(f'[ERROR] ChatGPT機能が利用できません（OpenAI APIキー未設定）')
+        await message.reply("❌ ChatGPT機能が利用できません。OPENAI_API_KEYを設定してください。\n"
+                           "設定方法: `!gptinfo` コマンドで詳細確認")
         return
     
     # 応答中の重複処理を防ぐ
@@ -394,14 +404,15 @@ if __name__ == '__main__':
         print('📝 手順:')
         print('   1. .envファイルを作成または確認')
         print('   2. DISCORD_TOKEN=your_token_here を設定')
-        return
+        exit(1)
         
-    if not OPENAI_API_KEY:
+    if not OPENAI_API_KEY or OPENAI_API_KEY == 'your_openai_api_key_here':
         print('⚠️  OPENAI_API_KEYが未設定です。')
         print('📝 手順:')
         print('   1. https://platform.openai.com/ でAPIキーを取得')
         print('   2. .envファイルに OPENAI_API_KEY=sk-your-key-here を設定')
         print('   3. ChatGPT機能は無効になります。')
+        print('🔄 現在はChatGPT機能無効でボットを起動します...')
         
     print('✅ 設定確認完了。ボットを起動します...')
     bot.run(DISCORD_TOKEN)
