@@ -152,7 +152,7 @@ async def on_reaction_add(reaction, user):
     print(f'[DEBUG] リアクションイベント発生')
     print(f'[DEBUG] リアクション絵文字: {reaction.emoji}')
     print(f'[DEBUG] リアクションしたユーザー: {user} (ID: {user.id})')
-    print(f'[DEBUG] メッセージチャンネル: {reaction.message.channel} (ID: {reaction.message.channel.id})')
+    print(f'[DEBUG] メッセージチャンネル: {reaction.message.channel.name} (ID: {reaction.message.channel.id})')
     print(f'[DEBUG] メッセージ内容: "{reaction.message.content}"')
 
     # ボット自身のリアクションは無視
@@ -164,6 +164,7 @@ async def on_reaction_add(reaction, user):
     ALLOWED_CHANNEL_ID = 1418467747083587607
     if reaction.message.channel.id != ALLOWED_CHANNEL_ID:
         print(f'[DEBUG] 許可されていないチャンネル ({reaction.message.channel.id}) からのリアクションなのでスキップ')
+        print(f'[DEBUG] 現在の許可チャンネルID: {ALLOWED_CHANNEL_ID}')
         return
 
     # グッドマーク（👍）リアクションに反応（肌色のバリエーションも含む）
@@ -194,6 +195,13 @@ async def on_raw_reaction_add(payload):
     print(f'[DEBUG] メッセージID: {payload.message_id}')
     print(f'[DEBUG] ユーザーID: {payload.user_id}')
     print(f'[DEBUG] 絵文字: {payload.emoji}')
+    
+    # チャンネル名も取得して表示
+    channel = bot.get_channel(payload.channel_id)
+    if channel:
+        print(f'[DEBUG] チャンネル名: {channel.name}')
+    else:
+        print('[DEBUG] チャンネル情報を取得できませんでした')
 
     # ボット自身のリアクションは無視
     if payload.user_id == bot.user.id:
@@ -204,6 +212,7 @@ async def on_raw_reaction_add(payload):
     ALLOWED_CHANNEL_ID = 1418467747083587607
     if payload.channel_id != ALLOWED_CHANNEL_ID:
         print(f'[DEBUG] 許可されていないチャンネル ({payload.channel_id}) からのリアクションなのでスキップ')
+        print(f'[DEBUG] 現在の許可チャンネルID: {ALLOWED_CHANNEL_ID}')
         return
 
     # グッドマーク（👍）リアクションに反応（肌色のバリエーションも含む）
