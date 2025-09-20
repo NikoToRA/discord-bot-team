@@ -7,7 +7,7 @@
 ### 🤖 自動返答機能
 - **対象チャンネル**: `1418512165165465600`
 - **動作**: メッセージが投稿されると自動的にChatGPTが返答
-- **モデル**: OpenAI GPT-3.5-turbo
+- **モデル**: OpenAI GPT-5
 - **会話記憶**: 直近10回の会話を記憶して文脈を理解
 
 ### 💬 ChatGPTの特徴
@@ -15,23 +15,47 @@
 - **日本語対応**: 日本語で自然な会話
 - **絵文字使用**: 表現豊かな返答
 - **簡潔性**: 500文字以内を目安とした分かりやすい返答
+- **高度な推論**: GPT-5の強化された推論能力を活用
 - **コード対応**: プログラミング関連の質問にも対応
 
 ## 使用方法
 
 ### 1. 環境設定
 
-#### 必要な環境変数
-`.env`ファイルに以下を設定：
-```
-DISCORD_TOKEN=your_discord_bot_token_here
-OPENAI_API_KEY=your_openai_api_key_here
-```
+#### 環境変数の設定
+1. **`.env`ファイルの作成**
+   ```bash
+   cd /Users/suguruhirayama/Desktop/AI実験室/Discordbot
+   cp .env.example .env
+   ```
 
-#### OpenAI APIキーの取得
-1. [OpenAI Platform](https://platform.openai.com/)にアカウント作成
-2. API Keys ページでAPIキーを生成
-3. `.env`ファイルに`OPENAI_API_KEY`として設定
+2. **`.env`ファイルに以下を設定**
+   ```bash
+   # Discord Bot Configuration
+   DISCORD_TOKEN=your_discord_bot_token_here
+   
+   # OpenAI API Configuration (GPT-5)
+   OPENAI_API_KEY=sk-your-actual-api-key-here
+   
+   # Optional: Organization ID (if you have one)
+   # OPENAI_ORGANIZATION=your_organization_id_here
+   ```
+
+#### OpenAI APIキーの取得手順
+1. [OpenAI Platform](https://platform.openai.com/)にアクセス
+2. アカウント作成またはログイン
+3. **API Keys** セクションに移動
+4. **"Create new secret key"** をクリック
+5. キーに名前を付けて生成
+6. **重要**: 生成されたキー（`sk-`で始まる文字列）をコピー
+7. `.env`ファイルの`OPENAI_API_KEY`に設定
+
+#### セキュリティ注意事項
+⚠️ **APIキーの取り扱い注意**
+- APIキーは絶対に他人と共有しない
+- GitHubなどの公開リポジトリにコミットしない
+- `.env`ファイルは`.gitignore`で除外する
+- キーが漏洩した場合は即座にOpenAIで無効化する
 
 ### 2. ボット実行
 
@@ -136,9 +160,10 @@ print(unique_list)  # [1, 2, 3, 4, 5]
 ## コスト管理
 
 ### API使用料目安
-- **GPT-3.5-turbo**: 入力 $0.0015/1K tokens, 出力 $0.002/1K tokens
-- **平均的な会話**: 1回あたり約0.1-0.5円
-- **月額**: 使用頻度による（100回/日で月約1,500-7,500円）
+- **GPT-5**: より高性能だが、料金は変動する可能性があります
+- **平均的な会話**: 1回あたり約0.5-2円（推定）
+- **月額**: 使用頻度による（100回/日で月約1,500-6,000円程度を想定）
+- **注意**: GPT-5の正式な料金体系は公式発表をご確認ください
 
 ### 節約方法
 - 対象チャンネルを限定

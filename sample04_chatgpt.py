@@ -38,8 +38,9 @@ else:
 
 # トークンエンコーダー初期化
 try:
-    encoding = tiktoken.encoding_for_model("gpt-3.5-turbo")
-    print('[SETUP] Tiktokenエンコーダー初期化完了')
+    # GPT-5用のエンコーダー（GPT-4と同じエンコーダーを使用）
+    encoding = tiktoken.encoding_for_model("gpt-4")
+    print('[SETUP] Tiktokenエンコーダー初期化完了 (GPT-5対応)')
 except Exception as e:
     print(f'[WARNING] Tiktokenエンコーダー初期化失敗: {e}')
     encoding = None
@@ -49,8 +50,8 @@ class ChatGPTResponder:
         self.client = openai_client
         self.is_responding = False
         self.response_history = []  # 会話履歴を保持
-        self.max_tokens = 1000  # 最大応答トークン数
-        self.max_context_tokens = 3000  # コンテキスト最大トークン数
+        self.max_tokens = 1500  # GPT-5用最大応答トークン数
+        self.max_context_tokens = 8000  # GPT-5用コンテキスト最大トークン数（128kの一部）
         self.retry_count = 3  # リトライ回数
         self.rate_limit_delay = 1  # レート制限時の待機時間
         
@@ -100,7 +101,7 @@ class ChatGPTResponder:
 - 質問には具体的で有用な情報を提供する
 - 必要に応じて絵文字を使用して表現を豊かにする
 - 日本語で返答する
-- 返答は簡潔で分かりやすくする（400文字以内を目安）
+- 返答は簡潔で分かりやすくする（500文字以内を目安）
 - コード例が必要な場合は、適切にフォーマットして提供する
 - 不適切な内容には応答しない
 
@@ -113,8 +114,8 @@ class ChatGPTResponder:
                 # 会話履歴を含むメッセージを作成
                 messages = [system_message]
                 
-                # 最近の履歴を含める（トークン制限考慮）
-                recent_history = self.response_history[-5:] if self.response_history else []
+                # 最近の履歴を含める（GPT-5の大きなコンテキストを活用）
+                recent_history = self.response_history[-8:] if self.response_history else []
                 for hist in recent_history:
                     messages.append({"role": "user", "content": hist["user_message"]})
                     messages.append({"role": "assistant", "content": hist["bot_response"]})
@@ -125,16 +126,17 @@ class ChatGPTResponder:
                 # トークン制限内に履歴を調整
                 messages = self.trim_conversation_history(messages)
             
-                # ChatGPT API呼び出し
+                # GPT-5 API呼び出し
                 response = self.client.chat.completions.create(
-                    model="gpt-3.5-turbo",
+                    model="gpt-5",
                     messages=messages,
                     max_tokens=self.max_tokens,
                     temperature=0.7,
                     top_p=0.9,
-                    frequency_penalty=0.3,
-                    presence_penalty=0.3,
-                    user=f"discord_user_{hash(user_name) % 10000}"  # ユーザー識別用
+                    frequency_penalty=0.2,
+                    presence_penalty=0.2,
+                    user=f"discord_user_{hash(user_name) % 10000}",  # ユーザー識別用
+                    stream=False  # GPT-5では明示的にstream設定を推奨
                 )
                 
                 ai_response = response.choices[0].message.content.strip()
@@ -194,7 +196,7 @@ class ChatGPTResponder:
             "recent_responses": len(recent_responses),
             "total_tokens": total_tokens,
             "recent_tokens": recent_tokens,
-            "estimated_cost_usd": total_tokens * 0.000002  # おおよそのコスト計算
+            "estimated_cost_usd": total_tokens * 0.00001  # GPT-5のおおよそのコスト計算（仮定値）
         }
 
 # ChatGPT応答者初期化
@@ -295,7 +297,7 @@ async def gpt_info(ctx):
     
     embed.add_field(name="🎯 対象チャンネル", value=f"<#{TARGET_CHANNEL_ID}>", inline=False)
     embed.add_field(name="🔧 動作方式", value="メッセージ投稿 → 自動でChatGPTが返答", inline=False)
-    embed.add_field(name="💡 使用モデル", value="gpt-3.5-turbo", inline=True)
+    embed.add_field(name="💡 使用モデル", value="GPT-5 🚀", inline=True)
     embed.add_field(name="📝 文字数制限", value="2000文字（自動分割対応）", inline=True)
     embed.add_field(name="🧠 記憶機能", value="直近10回の会話を記憶", inline=True)
     
@@ -387,12 +389,19 @@ if __name__ == '__main__':
     print(f'Discord Token: {"✅ 設定済み" if DISCORD_TOKEN else "❌ 未設定"}')
     print(f'OpenAI API Key: {"✅ 設定済み" if OPENAI_API_KEY else "❌ 未設定"}')
     
-    if DISCORD_TOKEN:
-        if OPENAI_API_KEY:
-            print('✅ すべての設定が完了しています。ボットを起動します...')
-        else:
-            print('⚠️  OPENAI_API_KEYが未設定です。ChatGPT機能は無効になります。')
+    if not DISCORD_TOKEN:
+        print('❌ DISCORD_TOKENが設定されていません。')
+        print('📝 手順:')
+        print('   1. .envファイルを作成または確認')
+        print('   2. DISCORD_TOKEN=your_token_here を設定')
+        return
         
-        bot.run(DISCORD_TOKEN)
-    else:
-        print('❌ DISCORD_TOKENが設定されていません。.envファイルを確認してください。')
+    if not OPENAI_API_KEY:
+        print('⚠️  OPENAI_API_KEYが未設定です。')
+        print('📝 手順:')
+        print('   1. https://platform.openai.com/ でAPIキーを取得')
+        print('   2. .envファイルに OPENAI_API_KEY=sk-your-key-here を設定')
+        print('   3. ChatGPT機能は無効になります。')
+        
+    print('✅ 設定確認完了。ボットを起動します...')
+    bot.run(DISCORD_TOKEN)
