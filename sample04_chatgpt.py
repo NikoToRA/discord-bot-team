@@ -3,6 +3,27 @@ from discord.ext import commands
 import os
 import asyncio
 import logging
+
+# ログ設定を追加
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='[%(asctime)s] [%(levelname)s] %(name)s: %(message)s',
+    handlers=[
+        logging.FileHandler('discord_bot.log', encoding='utf-8'),
+        logging.StreamHandler()
+    ]
+)
+
+# Discordライブラリのログレベルを設定
+discord_logger = logging.getLogger('discord')
+discord_logger.setLevel(logging.DEBUG)
+
+# OpenAIライブラリのログレベルを設定
+openai_logger = logging.getLogger('openai')
+openai_logger.setLevel(logging.DEBUG)
+
+# ボット専用ログ
+bot_logger = logging.getLogger('bot')
 import time
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -31,10 +52,13 @@ if OPENAI_API_KEY:
     try:
         client = OpenAI(api_key=OPENAI_API_KEY)
         print(f'[SETUP] OpenAI APIクライアント初期化完了')
+        bot_logger.info(f'OpenAI APIクライアント初期化完了 - キー: {OPENAI_API_KEY[:10]}...')
     except Exception as e:
         print(f'[ERROR] OpenAI APIクライアント初期化失敗: {e}')
+        bot_logger.error(f'OpenAI APIクライアント初期化失敗: {e}', exc_info=True)
 else:
     print('[WARNING] OPENAI_API_KEYが設定されていません')
+    bot_logger.warning('OPENAI_API_KEYが設定されていません')
 
 # トークンエンコーダー初期化
 try:
@@ -90,6 +114,7 @@ class ChatGPTResponder:
         for attempt in range(self.retry_count):
             try:
                 print(f'[GPT-4] {user_name}からのメッセージに応答中 (試行 {attempt + 1}/{self.retry_count}): {user_message[:50]}...')
+                bot_logger.info(f'GPT-4応答生成開始 - ユーザー: {user_name}, 試行: {attempt + 1}, メッセージ: {user_message[:100]}')
             
                 # システムメッセージでボットの性格を定義
                 system_message = {
@@ -127,6 +152,7 @@ class ChatGPTResponder:
                 messages = self.trim_conversation_history(messages)
             
                 # GPT-4 Chat Completions API呼び出し
+                bot_logger.debug(f'API呼び出し開始 - メッセージ数: {len(messages)}, モデル: gpt-4-turbo-preview')
                 response = self.client.chat.completions.create(
                     model="gpt-4-turbo-preview",
                     messages=messages,
@@ -134,12 +160,14 @@ class ChatGPTResponder:
                     temperature=0.7,
                     user=f"discord_user_{hash(user_name) % 10000}"  # ユーザー識別用
                 )
+                bot_logger.debug(f'API呼び出し完了 - レスポンス受信')
 
                 ai_response = response.choices[0].message.content.strip()
 
                 # 使用量情報をログに記録
                 usage = response.usage
                 print(f'[API] トークン使用量 - 入力: {usage.prompt_tokens}, 出力: {usage.completion_tokens}, 合計: {usage.total_tokens}')
+                bot_logger.info(f'トークン使用量 - 入力: {usage.prompt_tokens}, 出力: {usage.completion_tokens}, 合計: {usage.total_tokens}')
                 
                 # 履歴に追加（最大10件まで保持）
                 self.response_history.append({
@@ -155,6 +183,7 @@ class ChatGPTResponder:
                     self.response_history = self.response_history[-10:]
                 
                 print(f'[GPT-4] 応答生成完了: {ai_response[:50]}...')
+                bot_logger.info(f'GPT-4応答生成完了 - 文字数: {len(ai_response)}, 内容: {ai_response[:100]}...')
                 return ai_response
                 
             except Exception as e:
@@ -162,6 +191,7 @@ class ChatGPTResponder:
                 error_message = str(e)
                 
                 print(f'[ERROR] API呼び出しエラー (試行 {attempt + 1}/{self.retry_count}): {error_type} - {error_message}')
+                bot_logger.error(f'API呼び出しエラー (試行 {attempt + 1}): {error_type} - {error_message}', exc_info=True)
                 
                 # 特定のエラーに対する対応
                 if "rate_limit" in error_message.lower():
@@ -223,23 +253,29 @@ async def on_message(message):
     print(f'[DEBUG] 送信者: {message.author} (ID: {message.author.id})')
     print(f'[DEBUG] ボット自身: {bot.user} (ID: {bot.user.id if bot.user else "None"})')
     print(f'[DEBUG] メッセージ内容: "{message.content}"')
+
+    bot_logger.debug(f'メッセージイベント - チャンネル: {message.channel.id}, 送信者: {message.author}, 内容: {message.content}')
     
     # ボット自身のメッセージは無視
     if message.author == bot.user:
         print('[DEBUG] ボット自身のメッセージなのでスキップ')
+        bot_logger.debug('ボット自身のメッセージなのでスキップ')
         return
-    
+
     # 対象チャンネル以外は無視
     if message.channel.id != TARGET_CHANNEL_ID:
         print(f'[DEBUG] 対象外チャンネル ({message.channel.id}) なのでスキップ')
+        bot_logger.debug(f'対象外チャンネル ({message.channel.id}) なのでスキップ')
         return
-    
+
     # 空のメッセージやコマンドは無視
     if not message.content.strip() or message.content.startswith('!'):
         print(f'[DEBUG] 空メッセージまたはコマンドなのでスキップ: "{message.content}"')
+        bot_logger.debug(f'空メッセージまたはコマンドなのでスキップ: "{message.content}"')
         return
-    
+
     print(f'[DEBUG] 対象チャンネルでメッセージ検出: {message.author} - {message.content[:50]}...')
+    bot_logger.info(f'対象チャンネルでメッセージ検出 - ユーザー: {message.author}, 内容: {message.content}')
     
     # GPT-4が利用可能かチェック
     if not chatgpt_responder:
