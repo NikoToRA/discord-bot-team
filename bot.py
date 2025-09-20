@@ -50,9 +50,7 @@ async def on_ready():
             print(f'  - {channel.name} (ID: {channel.id})')
             # 特定のチャンネルIDをチェック
             if channel.id == 1418511738046779393:
-                print(f'    ★ 定期投稿対象チャンネル発見！')
-            if channel.id == 1418467747083587607:
-                print(f'    ★ リアクション対象チャンネル発見！')
+                print(f'    ★ room1チャンネル発見！（定期投稿・リアクション対象）')
     print('Intents設定:')
     print(f'message_content: {bot.intents.message_content}')
     print(f'guilds: {bot.intents.guilds}')
@@ -161,7 +159,7 @@ async def on_reaction_add(reaction, user):
         return
 
     # 指定されたチャンネルでのみ反応
-    ALLOWED_CHANNEL_ID = 1418467747083587607
+    ALLOWED_CHANNEL_ID = 1418511738046779393  # room1
     if reaction.message.channel.id != ALLOWED_CHANNEL_ID:
         print(f'[DEBUG] 許可されていないチャンネル ({reaction.message.channel.id}) からのリアクションなのでスキップ')
         print(f'[DEBUG] 現在の許可チャンネルID: {ALLOWED_CHANNEL_ID}')
@@ -209,7 +207,7 @@ async def on_raw_reaction_add(payload):
         return
 
     # 指定されたチャンネルでのみ反応
-    ALLOWED_CHANNEL_ID = 1418467747083587607
+    ALLOWED_CHANNEL_ID = 1418511738046779393  # room1
     if payload.channel_id != ALLOWED_CHANNEL_ID:
         print(f'[DEBUG] 許可されていないチャンネル ({payload.channel_id}) からのリアクションなのでスキップ')
         print(f'[DEBUG] 現在の許可チャンネルID: {ALLOWED_CHANNEL_ID}')
