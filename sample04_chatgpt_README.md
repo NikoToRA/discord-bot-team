@@ -23,22 +23,19 @@
 ### 1. 環境設定
 
 #### 環境変数の設定
-1. **`.env`ファイルの作成**
+**既存の`.env`ファイルにOpenAI APIキーを追加**
+
+1. **現在の`.env`ファイルを確認**
    ```bash
    cd /Users/suguruhirayama/Desktop/AI実験室/Discordbot
-   cp .env.example .env
+   cat .env
    ```
 
-2. **`.env`ファイルに以下を設定**
+2. **`.env`ファイルにOpenAI APIキーを追加**
+   既存のDiscord tokenはそのままに、以下の行を追加：
    ```bash
-   # Discord Bot Configuration
-   DISCORD_TOKEN=your_discord_bot_token_here
-   
    # OpenAI API Configuration (GPT-5)
    OPENAI_API_KEY=sk-your-actual-api-key-here
-   
-   # Optional: Organization ID (if you have one)
-   # OPENAI_ORGANIZATION=your_organization_id_here
    ```
 
 #### OpenAI APIキーの取得手順

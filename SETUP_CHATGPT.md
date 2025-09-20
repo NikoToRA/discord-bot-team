@@ -2,20 +2,22 @@
 
 ## 🚀 クイックスタート
 
-### 1. 環境ファイルの準備
+### 1. 既存の.envファイルを確認
 ```bash
 cd /Users/suguruhirayama/Desktop/AI実験室/Discordbot
-cp .env.example .env
+cat .env
 ```
 
-### 2. APIキーの設定
-`.env`ファイルを編集して以下を設定：
+**良いニュース！** 既にDiscord tokenが設定済みです 🎉
+
+### 2. OpenAI APIキーを追加
+既存の`.env`ファイルにOpenAI APIキーを追加するだけです：
 
 ```bash
-# Discord Bot Token
-DISCORD_TOKEN=your_discord_bot_token_here
+# 既存のファイル内容はそのまま
+DISCORD_TOKEN=（既に設定済み）
 
-# OpenAI API Key for GPT-5
+# 以下を追加
 OPENAI_API_KEY=sk-your-openai-api-key-here
 ```
 
@@ -28,7 +30,10 @@ OPENAI_API_KEY=sk-your-openai-api-key-here
 4. **「Create new secret key」** をクリック
 5. キーに名前を付けて **「Create secret key」** をクリック
 6. **重要**: 表示されたキー（`sk-`で始まる）をコピー
-7. `.env`ファイルに貼り付け
+7. **既存の`.env`ファイル**を開いて、以下の行を追加：
+   ```bash
+   OPENAI_API_KEY=sk-（コピーしたキー）
+   ```
 
 #### APIキーの例
 ```
