@@ -3,10 +3,12 @@ from discord.ext import commands
 import os
 import asyncio
 import logging
+import time
 from dotenv import load_dotenv
-import openai
 from openai import OpenAI
 import datetime
+import json
+import tiktoken
 
 load_dotenv()
 
@@ -26,95 +28,173 @@ client = None
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 
 if OPENAI_API_KEY:
-    client = OpenAI(api_key=OPENAI_API_KEY)
-    print(f'[SETUP] OpenAI APIキーが設定されました')
+    try:
+        client = OpenAI(api_key=OPENAI_API_KEY)
+        print(f'[SETUP] OpenAI APIクライアント初期化完了')
+    except Exception as e:
+        print(f'[ERROR] OpenAI APIクライアント初期化失敗: {e}')
 else:
     print('[WARNING] OPENAI_API_KEYが設定されていません')
+
+# トークンエンコーダー初期化
+try:
+    encoding = tiktoken.encoding_for_model("gpt-3.5-turbo")
+    print('[SETUP] Tiktokenエンコーダー初期化完了')
+except Exception as e:
+    print(f'[WARNING] Tiktokenエンコーダー初期化失敗: {e}')
+    encoding = None
 
 class ChatGPTResponder:
     def __init__(self, openai_client):
         self.client = openai_client
         self.is_responding = False
         self.response_history = []  # 会話履歴を保持
+        self.max_tokens = 1000  # 最大応答トークン数
+        self.max_context_tokens = 3000  # コンテキスト最大トークン数
+        self.retry_count = 3  # リトライ回数
+        self.rate_limit_delay = 1  # レート制限時の待機時間
         
+    def count_tokens(self, text):
+        """テキストのトークン数をカウント"""
+        if encoding:
+            try:
+                return len(encoding.encode(text))
+            except Exception:
+                return len(text) // 4  # おおよその推定
+        return len(text) // 4  # おおよその推定
+    
+    def trim_conversation_history(self, messages):
+        """会話履歴をトークン制限内に収める"""
+        if not encoding:
+            return messages[-8:]  # エンコーダーがない場合は直近8件
+        
+        total_tokens = 0
+        trimmed_messages = []
+        
+        # 逆順で処理して、制限内の最新履歴を保持
+        for message in reversed(messages):
+            message_tokens = self.count_tokens(json.dumps(message, ensure_ascii=False))
+            if total_tokens + message_tokens > self.max_context_tokens:
+                break
+            total_tokens += message_tokens
+            trimmed_messages.insert(0, message)
+        
+        return trimmed_messages
+    
     async def generate_response(self, user_message, user_name, channel_name):
-        """ChatGPTに返答を生成させる"""
+        """ChatGPTに返答を生成させる（リトライ機能付き）"""
         if not self.client:
             return "❌ OpenAI APIが設定されていません。"
+        
+        for attempt in range(self.retry_count):
+            try:
+                print(f'[CHATGPT] {user_name}からのメッセージに応答中 (試行 {attempt + 1}/{self.retry_count}): {user_message[:50]}...')
             
-        try:
-            print(f'[CHATGPT] {user_name}からのメッセージに応答中: {user_message[:50]}...')
-            
-            # システムメッセージでボットの性格を定義
-            system_message = {
-                "role": "system",
-                "content": f"""あなたは親しみやすく知識豊富なDiscordボットのアシスタントです。
-                
+                # システムメッセージでボットの性格を定義
+                system_message = {
+                    "role": "system",
+                    "content": f"""あなたは親しみやすく知識豊富なDiscordボットのアシスタントです。
+
 特徴:
 - 親しみやすく、フレンドリーな口調で話す
 - 質問には具体的で有用な情報を提供する
 - 必要に応じて絵文字を使用して表現を豊かにする
 - 日本語で返答する
-- 返答は簡潔で分かりやすくする（500文字以内を目安）
+- 返答は簡潔で分かりやすくする（400文字以内を目安）
 - コード例が必要な場合は、適切にフォーマットして提供する
+- 不適切な内容には応答しない
 
 現在の状況:
 - チャンネル: {channel_name}
 - ユーザー: {user_name}
 - 日時: {datetime.datetime.now().strftime('%Y年%m月%d日 %H時%M分')}"""
-            }
+                }
+                
+                # 会話履歴を含むメッセージを作成
+                messages = [system_message]
+                
+                # 最近の履歴を含める（トークン制限考慮）
+                recent_history = self.response_history[-5:] if self.response_history else []
+                for hist in recent_history:
+                    messages.append({"role": "user", "content": hist["user_message"]})
+                    messages.append({"role": "assistant", "content": hist["bot_response"]})
+                
+                # 現在のユーザーメッセージを追加
+                messages.append({"role": "user", "content": user_message})
+                
+                # トークン制限内に履歴を調整
+                messages = self.trim_conversation_history(messages)
             
-            # 会話履歴を含むメッセージを作成
-            messages = [system_message]
-            
-            # 最近の履歴を含める（最大5件）
-            recent_history = self.response_history[-5:] if self.response_history else []
-            for hist in recent_history:
-                messages.append({"role": "user", "content": hist["user_message"]})
-                messages.append({"role": "assistant", "content": hist["bot_response"]})
-            
-            # 現在のユーザーメッセージを追加
-            messages.append({"role": "user", "content": user_message})
-            
-            # ChatGPT API呼び出し
-            response = self.client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=messages,
-                max_tokens=800,
-                temperature=0.7,
-                top_p=1,
-                frequency_penalty=0,
-                presence_penalty=0
-            )
-            
-            ai_response = response.choices[0].message.content.strip()
-            
-            # 履歴に追加（最大10件まで保持）
-            self.response_history.append({
-                "user_name": user_name,
-                "user_message": user_message,
-                "bot_response": ai_response,
-                "timestamp": datetime.datetime.now().isoformat()
-            })
-            
-            # 履歴が10件を超えたら古いものを削除
-            if len(self.response_history) > 10:
-                self.response_history = self.response_history[-10:]
-            
-            print(f'[CHATGPT] 応答生成完了: {ai_response[:50]}...')
-            return ai_response
-            
-        except Exception as e:
-            error_message = f"ChatGPTとの通信中にエラーが発生しました: {str(e)}"
-            print(f'[ERROR] {error_message}')
-            return f"❌ {error_message}"
+                # ChatGPT API呼び出し
+                response = self.client.chat.completions.create(
+                    model="gpt-3.5-turbo",
+                    messages=messages,
+                    max_tokens=self.max_tokens,
+                    temperature=0.7,
+                    top_p=0.9,
+                    frequency_penalty=0.3,
+                    presence_penalty=0.3,
+                    user=f"discord_user_{hash(user_name) % 10000}"  # ユーザー識別用
+                )
+                
+                ai_response = response.choices[0].message.content.strip()
+                
+                # 使用量情報をログに記録
+                usage = response.usage
+                print(f'[API] トークン使用量 - 入力: {usage.prompt_tokens}, 出力: {usage.completion_tokens}, 合計: {usage.total_tokens}')
+                
+                # 履歴に追加（最大10件まで保持）
+                self.response_history.append({
+                    "user_name": user_name,
+                    "user_message": user_message,
+                    "bot_response": ai_response,
+                    "timestamp": datetime.datetime.now().isoformat(),
+                    "tokens_used": usage.total_tokens
+                })
+                
+                # 履歴が10件を超えたら古いものを削除
+                if len(self.response_history) > 10:
+                    self.response_history = self.response_history[-10:]
+                
+                print(f'[CHATGPT] 応答生成完了: {ai_response[:50]}...')
+                return ai_response
+                
+            except Exception as e:
+                error_type = type(e).__name__
+                error_message = str(e)
+                
+                print(f'[ERROR] API呼び出しエラー (試行 {attempt + 1}/{self.retry_count}): {error_type} - {error_message}')
+                
+                # 特定のエラーに対する対応
+                if "rate_limit" in error_message.lower():
+                    print(f'[WARNING] レート制限検出。{self.rate_limit_delay * (attempt + 1)}秒待機中...')
+                    await asyncio.sleep(self.rate_limit_delay * (attempt + 1))
+                    continue
+                elif "insufficient_quota" in error_message.lower():
+                    return "❌ OpenAI APIの利用枠を超過しました。APIキーの残高を確認してください。"
+                elif "invalid_api_key" in error_message.lower():
+                    return "❌ OpenAI APIキーが無効です。設定を確認してください。"
+                elif attempt == self.retry_count - 1:  # 最後の試行
+                    return f"❌ ChatGPTとの通信中にエラーが発生しました: {error_type}"
+                
+                # リトライ前の短い待機
+                await asyncio.sleep(0.5)
+        
+        return "❌ 複数回の試行後もChatGPTとの通信に失敗しました。"
     
     def get_usage_stats(self):
         """使用統計を取得"""
+        total_tokens = sum(h.get('tokens_used', 0) for h in self.response_history)
+        recent_responses = [h for h in self.response_history 
+                           if (datetime.datetime.now() - datetime.datetime.fromisoformat(h['timestamp'])).seconds < 3600]
+        recent_tokens = sum(h.get('tokens_used', 0) for h in recent_responses)
+        
         return {
             "total_responses": len(self.response_history),
-            "recent_responses": len([h for h in self.response_history 
-                                   if (datetime.datetime.now() - datetime.datetime.fromisoformat(h['timestamp'])).seconds < 3600])
+            "recent_responses": len(recent_responses),
+            "total_tokens": total_tokens,
+            "recent_tokens": recent_tokens,
+            "estimated_cost_usd": total_tokens * 0.000002  # おおよそのコスト計算
         }
 
 # ChatGPT応答者初期化
@@ -224,7 +304,10 @@ async def gpt_info(ctx):
         stats = chatgpt_responder.get_usage_stats()
         embed.add_field(name="📊 使用統計", 
                        value=f"総応答数: {stats['total_responses']}\n直近1時間: {stats['recent_responses']}", 
-                       inline=False)
+                       inline=True)
+        embed.add_field(name="💰 トークン使用量", 
+                       value=f"総計: {stats['total_tokens']:,}\n直近1時間: {stats['recent_tokens']:,}\n推定コスト: ${stats['estimated_cost_usd']:.4f}", 
+                       inline=True)
         
         embed.add_field(name="✅ API状態", value="正常動作中", inline=True)
     else:
