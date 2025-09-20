@@ -60,10 +60,11 @@ async def on_ready():
     print(f'reactions: {bot.intents.reactions}')
     print(f'guild_reactions: {bot.intents.guild_reactions}')
     
-    # 定期投稿タスクを開始
-    if not periodic_greeting.is_running():
-        periodic_greeting.start()
-        print('[DEBUG] 定期投稿タスクを開始しました')
+    # 定期投稿タスクを開始（現在停止中）
+    # if not periodic_greeting.is_running():
+    #     periodic_greeting.start()
+    #     print('[DEBUG] 定期投稿タスクを開始しました')
+    print('[DEBUG] 定期投稿タスクは停止中です')
 
 # 定期投稿タスク（10秒ごと）
 @tasks.loop(seconds=10)
