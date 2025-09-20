@@ -127,7 +127,7 @@ async def on_ready():
             print(f'  - {channel.name} (ID: {channel.id})')
             # 特定のチャンネルIDをチェック
             if channel.id == 1418511738046779393:
-                print(f'    ★ room1チャンネル発見！（定期投稿・リアクション対象）')
+                print(f'    ★ room1チャンネル発見！（メッセージ・リアクション・ログ収集対象）')
     print('Intents設定:')
     print(f'message_content: {bot.intents.message_content}')
     print(f'guilds: {bot.intents.guilds}')
@@ -182,7 +182,7 @@ async def on_message(message):
         return
 
     # 指定されたチャンネルでのみ反応
-    ALLOWED_CHANNEL_ID = 1418467747083587607
+    ALLOWED_CHANNEL_ID = 1418511738046779393  # room1
     if message.channel.id != ALLOWED_CHANNEL_ID:
         print(f'[DEBUG] 許可されていないチャンネル ({message.channel.id}) からのメッセージなのでスキップ')
         return
@@ -297,26 +297,9 @@ async def on_raw_reaction_add(payload):
         print(f'[DEBUG] チャンネル {payload.channel_id} が見つからない')
         return
     
-    # グッドマーク（👍）リアクション - 通常の返信
+    # グッドマーク（👍）リアクション - ログ収集機能
     thumbs_up_emojis = ['👍', '👍🏻', '👍🏼', '👍🏽', '👍🏾', '👍🏿']
     if emoji_str in thumbs_up_emojis:
-        print(f'[DEBUG] RAWイベントでグッドマーク検知: {emoji_str}')
-        
-        # 実行環境に応じて返信を変える
-        if os.path.exists('.env'):
-            response = 'グッドマークが押されたよ！ (ローカルから・RAW) 🏠'
-        else:
-            response = 'グッドマークが押されたよ！ (Railwayから・RAW) ☁️'
-
-        print(f'[DEBUG] RAWイベントで返信: {response}')
-        try:
-            await channel.send(response)
-            print('[DEBUG] RAWリアクション返信送信成功')
-        except Exception as e:
-            print(f'[DEBUG] RAWリアクション返信送信エラー: {e}')
-            
-    # クリップボード（📋）リアクション - ログ収集
-    elif emoji_str == '📋':
         print(f'[DEBUG] RAWイベントでログ収集リアクション検知: {emoji_str}')
         
         # 既に収集中の場合はスキップ
@@ -383,10 +366,10 @@ async def log_info(ctx):
         description="チャンネルのメッセージログを収集します",
         color=0x0099ff
     )
-    embed.add_field(name="🔧 使用方法", value="任意のメッセージに 📋 リアクションを付ける", inline=False)
+    embed.add_field(name="🔧 使用方法", value="任意のメッセージに 👍 リアクションを付ける", inline=False)
     embed.add_field(name="📊 収集内容", value="• 投稿日時\n• 投稿者\n• メッセージ内容\n• 添付ファイル\n• リアクション", inline=False)
     embed.add_field(name="⚙️ 仕様", value="• 100件ごとに2秒休憩\n• 8MB以下でDiscordにアップロード\n• それ以上はローカル保存", inline=False)
-    embed.add_field(name="📝 既存機能", value="👍 リアクション: 通常の返信\n📋 リアクション: ログ収集", inline=False)
+    embed.add_field(name="📝 機能", value="👍 リアクション: そのチャンネルのログ収集", inline=False)
     
     await ctx.send(embed=embed)
 
