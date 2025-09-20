@@ -44,6 +44,15 @@ async def on_ready():
     for guild in bot.guilds:
         print(f'サーバー: {guild.name} (ID: {guild.id})')
         print(f'メンバー数: {guild.member_count}')
+        print(f'アクセス可能なチャンネル数: {len(guild.text_channels)}')
+        print('チャンネル一覧:')
+        for channel in guild.text_channels:
+            print(f'  - {channel.name} (ID: {channel.id})')
+            # 特定のチャンネルIDをチェック
+            if channel.id == 1418511738046779393:
+                print(f'    ★ 定期投稿対象チャンネル発見！')
+            if channel.id == 1418467747083587607:
+                print(f'    ★ リアクション対象チャンネル発見！')
     print('Intents設定:')
     print(f'message_content: {bot.intents.message_content}')
     print(f'guilds: {bot.intents.guilds}')
