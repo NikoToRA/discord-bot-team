@@ -142,6 +142,56 @@ async def on_reaction_add(reaction, user):
     else:
         print(f'[DEBUG] グッドマーク以外のリアクション ({reaction.emoji}) なので無視')
 
+@bot.event
+async def on_raw_reaction_add(payload):
+    """
+    過去のメッセージ（キャッシュにないメッセージ）へのリアクションにも対応するためのrawイベントハンドラー
+    """
+    print(f'[DEBUG] RAWリアクションイベント発生')
+    print(f'[DEBUG] チャンネルID: {payload.channel_id}')
+    print(f'[DEBUG] メッセージID: {payload.message_id}')
+    print(f'[DEBUG] ユーザーID: {payload.user_id}')
+    print(f'[DEBUG] 絵文字: {payload.emoji}')
+
+    # ボット自身のリアクションは無視
+    if payload.user_id == bot.user.id:
+        print('[DEBUG] ボット自身のリアクションなのでスキップ')
+        return
+
+    # 指定されたチャンネルでのみ反応
+    ALLOWED_CHANNEL_ID = 1418467747083587607
+    if payload.channel_id != ALLOWED_CHANNEL_ID:
+        print(f'[DEBUG] 許可されていないチャンネル ({payload.channel_id}) からのリアクションなのでスキップ')
+        return
+
+    # グッドマーク（👍）リアクションに反応（肌色のバリエーションも含む）
+    thumbs_up_emojis = ['👍', '👍🏻', '👍🏼', '👍🏽', '👍🏾', '👍🏿']
+    emoji_str = str(payload.emoji)
+    
+    if emoji_str in thumbs_up_emojis:
+        print(f'[DEBUG] RAWイベントでグッドマーク検知: {emoji_str}')
+        
+        # チャンネルオブジェクトを取得
+        channel = bot.get_channel(payload.channel_id)
+        if not channel:
+            print(f'[DEBUG] チャンネル {payload.channel_id} が見つからない')
+            return
+
+        # 実行環境に応じて返信を変える
+        if os.path.exists('.env'):
+            response = 'グッドマークが押されたよ！ (ローカルから・RAW) 🏠'
+        else:
+            response = 'グッドマークが押されたよ！ (Railwayから・RAW) ☁️'
+
+        print(f'[DEBUG] RAWイベントで返信: {response}')
+        try:
+            await channel.send(response)
+            print('[DEBUG] RAWリアクション返信送信成功')
+        except Exception as e:
+            print(f'[DEBUG] RAWリアクション返信送信エラー: {e}')
+    else:
+        print(f'[DEBUG] RAWイベント: グッドマーク以外のリアクション ({emoji_str}) なので無視')
+
 if __name__ == '__main__':
     print('=== Discord Bot 起動中 ===')
     print(f'現在のディレクトリ: {os.getcwd()}')
