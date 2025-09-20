@@ -1,5 +1,5 @@
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 import os
 import logging
 from dotenv import load_dotenv
@@ -50,6 +50,38 @@ async def on_ready():
     print(f'guild_messages: {bot.intents.guild_messages}')
     print(f'reactions: {bot.intents.reactions}')
     print(f'guild_reactions: {bot.intents.guild_reactions}')
+    
+    # 定期投稿タスクを開始
+    if not periodic_greeting.is_running():
+        periodic_greeting.start()
+        print('[DEBUG] 定期投稿タスクを開始しました')
+
+# 定期投稿タスク（10秒ごと）
+@tasks.loop(seconds=10)
+async def periodic_greeting():
+    """10秒ごとに指定チャンネルに「おはようございます」を投稿"""
+    GREETING_CHANNEL_ID = 1418511738046779393
+    channel = bot.get_channel(GREETING_CHANNEL_ID)
+    
+    if channel:
+        # 実行環境に応じてメッセージを変える
+        if os.path.exists('.env'):
+            message = 'おはようございます (ローカルから) 🏠'
+        else:
+            message = 'おはようございます (Railwayから) ☁️'
+        
+        try:
+            await channel.send(message)
+            print(f'[DEBUG] 定期投稿成功: {message}')
+        except Exception as e:
+            print(f'[DEBUG] 定期投稿エラー: {e}')
+    else:
+        print(f'[DEBUG] チャンネル {GREETING_CHANNEL_ID} が見つかりません')
+
+@periodic_greeting.before_loop
+async def before_periodic_greeting():
+    """定期投稿開始前にボットの準備を待つ"""
+    await bot.wait_until_ready()
 
 @bot.event
 async def on_message(message):
