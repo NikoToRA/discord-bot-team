@@ -9,15 +9,20 @@ from dotenv import load_dotenv
 from openai import OpenAI
 import datetime
 
-# ログ設定
+# ログ設定を強化
 logging.basicConfig(
     level=logging.DEBUG,
     format='[%(asctime)s] [%(levelname)s] %(name)s: %(message)s',
     handlers=[
-        logging.FileHandler('voice_bot.log', encoding='utf-8'),
+        logging.FileHandler('voice_bot_debug.log', encoding='utf-8'),
         logging.StreamHandler()
     ]
 )
+
+# 全てのDiscordイベントをログ出力
+logging.getLogger('discord').setLevel(logging.DEBUG)
+logging.getLogger('discord.gateway').setLevel(logging.DEBUG)
+logging.getLogger('discord.client').setLevel(logging.DEBUG)
 
 discord_logger = logging.getLogger('discord')
 discord_logger.setLevel(logging.INFO)
@@ -54,7 +59,7 @@ else:
     bot_logger.warning('OPENAI_API_KEYが設定されていません')
 
 # 対応する音声ファイル形式
-SUPPORTED_AUDIO_FORMATS = ['.mp3', '.mp4', '.mpeg', '.mpga', '.m4a', '.wav', '.webm']
+SUPPORTED_AUDIO_FORMATS = ['.mp3', '.mp4', '.mpeg', '.mpga', '.m4a', '.wav', '.webm', '.ogg']
 
 # 音声処理のためのリアクション
 TRANSCRIBE_EMOJI = '🔄'
@@ -171,15 +176,29 @@ async def on_ready():
     print(f'対象チャンネル: {TARGET_CHANNEL_ID}')
     print(f'OpenAI API: {"✅ 設定済み" if client else "❌ 未設定"}')
     print(f'対応音声形式: {", ".join(SUPPORTED_AUDIO_FORMATS)}')
+    bot_logger.info(f'ボット起動完了 - ユーザー: {bot.user}')
 
     # サーバー情報表示
     for guild in bot.guilds:
         print(f'サーバー: {guild.name} (ID: {guild.id})')
+        bot_logger.info(f'接続サーバー: {guild.name} (ID: {guild.id})')
         target_channel = bot.get_channel(TARGET_CHANNEL_ID)
         if target_channel and target_channel.guild == guild:
             print(f'  ✅ 対象チャンネル発見: {target_channel.name}')
+            bot_logger.info(f'対象チャンネル発見: {target_channel.name} (ID: {TARGET_CHANNEL_ID})')
         else:
             print(f'  ❓ 対象チャンネル未発見')
+            bot_logger.warning(f'対象チャンネル未発見: ID {TARGET_CHANNEL_ID}')
+
+    # 権限チェック
+    if target_channel:
+        permissions = target_channel.permissions_for(guild.me)
+        print(f'  📝 権限チェック:')
+        print(f'    - メッセージ読み取り: {permissions.read_messages}')
+        print(f'    - メッセージ送信: {permissions.send_messages}')
+        print(f'    - リアクション追加: {permissions.add_reactions}')
+        print(f'    - リアクション閲覧: {permissions.read_message_history}')
+        bot_logger.info(f'権限 - 読み取り:{permissions.read_messages}, 送信:{permissions.send_messages}, リアクション:{permissions.add_reactions}')
 
 @bot.event
 async def on_message(message):
@@ -250,66 +269,68 @@ async def on_message(message):
 async def on_reaction_add(reaction, user):
     """リアクション追加時の処理"""
     print(f'[REACTION] リアクション検出: {reaction.emoji} by {user} on {reaction.message.id}')
-    bot_logger.debug(f'リアクション追加: {reaction.emoji} by {user} on {reaction.message.id}')
+    print(f'[REACTION] チャンネル: {reaction.message.channel.id}, 絵文字タイプ: {type(reaction.emoji)}')
+    bot_logger.info(f'リアクション追加: {reaction.emoji} by {user} on {reaction.message.id} in channel {reaction.message.channel.id}')
 
-    # ボット自身のリアクションは無視
-    if user == bot.user:
-        print(f'[REACTION] ボット自身のリアクションなのでスキップ')
-        bot_logger.debug('ボット自身のリアクションなのでスキップ')
-        return
-
-    # 対象チャンネル以外は無視
-    if reaction.message.channel.id != TARGET_CHANNEL_ID:
-        print(f'[REACTION] 対象外チャンネル ({reaction.message.channel.id}) なのでスキップ')
-        bot_logger.debug(f'対象外チャンネル ({reaction.message.channel.id}) なのでスキップ')
-        return
-
-    # 文字起こしリアクションかチェック
-    print(f'[REACTION] リアクション絵文字チェック: "{str(reaction.emoji)}" vs "{TRANSCRIBE_EMOJI}"')
-    if str(reaction.emoji) != TRANSCRIBE_EMOJI:
-        print(f'[REACTION] 対象外リアクション ({str(reaction.emoji)}) なのでスキップ')
-        bot_logger.debug(f'対象外リアクション ({str(reaction.emoji)}) なのでスキップ')
-        return
-
-    print(f'[REACTION] 🔄リアクション検出！処理開始')
-
-    # 音声文字起こし機能が無効な場合
-    if not voice_transcriber:
-        await reaction.message.reply("❌ 音声文字起こし機能が利用できません。OPENAI_API_KEYを設定してください。")
-        return
-
-    # 既に処理中の場合
-    if reaction.message.id in voice_transcriber.processing_messages:
-        await reaction.message.reply("⏳ この音声ファイルは既に処理中です。少しお待ちください。")
-        return
-
-    # 元のメッセージ（音声ファイルが添付されたメッセージ）を取得
-    original_message = None
-
-    # リアクションされたメッセージが返信の場合、元メッセージを取得
-    if reaction.message.reference and reaction.message.reference.message_id:
-        try:
-            original_message = await reaction.message.channel.fetch_message(reaction.message.reference.message_id)
-        except discord.NotFound:
-            await reaction.message.reply("❌ 元のメッセージが見つかりません。")
-            return
-    else:
-        original_message = reaction.message
-
-    # 音声ファイルをチェック
-    audio_attachments = []
-    for attachment in original_message.attachments:
-        if voice_transcriber.is_audio_file(attachment.filename):
-            audio_attachments.append(attachment)
-
-    if not audio_attachments:
-        await reaction.message.reply("❌ 音声ファイルが見つかりません。対応形式: " + ", ".join(SUPPORTED_AUDIO_FORMATS))
-        return
-
-    # 処理開始
-    voice_transcriber.processing_messages.add(reaction.message.id)
-
+    # 全ての処理ステップをログ出力
     try:
+        # ボット自身のリアクションは無視
+        if user == bot.user:
+            print(f'[REACTION] ボット自身のリアクションなのでスキップ')
+            bot_logger.debug('ボット自身のリアクションなのでスキップ')
+            return
+
+        # 対象チャンネル以外は無視
+        if reaction.message.channel.id != TARGET_CHANNEL_ID:
+            print(f'[REACTION] 対象外チャンネル ({reaction.message.channel.id}) なのでスキップ')
+            bot_logger.debug(f'対象外チャンネル ({reaction.message.channel.id}) なのでスキップ')
+            return
+
+        # 文字起こしリアクションかチェック
+        print(f'[REACTION] リアクション絵文字チェック: "{str(reaction.emoji)}" vs "{TRANSCRIBE_EMOJI}"')
+        if str(reaction.emoji) != TRANSCRIBE_EMOJI:
+            print(f'[REACTION] 対象外リアクション ({str(reaction.emoji)}) なのでスキップ')
+            bot_logger.debug(f'対象外リアクション ({str(reaction.emoji)}) なのでスキップ')
+            return
+
+        print(f'[REACTION] 🔄リアクション検出！処理開始')
+
+        # 音声文字起こし機能が無効な場合
+        if not voice_transcriber:
+            await reaction.message.reply("❌ 音声文字起こし機能が利用できません。OPENAI_API_KEYを設定してください。")
+            return
+
+        # 既に処理中の場合
+        if reaction.message.id in voice_transcriber.processing_messages:
+            await reaction.message.reply("⏳ この音声ファイルは既に処理中です。少しお待ちください。")
+            return
+
+        # 元のメッセージ（音声ファイルが添付されたメッセージ）を取得
+        original_message = None
+
+        # リアクションされたメッセージが返信の場合、元メッセージを取得
+        if reaction.message.reference and reaction.message.reference.message_id:
+            try:
+                original_message = await reaction.message.channel.fetch_message(reaction.message.reference.message_id)
+            except discord.NotFound:
+                await reaction.message.reply("❌ 元のメッセージが見つかりません。")
+                return
+        else:
+            original_message = reaction.message
+
+        # 音声ファイルをチェック
+        audio_attachments = []
+        for attachment in original_message.attachments:
+            if voice_transcriber.is_audio_file(attachment.filename):
+                audio_attachments.append(attachment)
+
+        if not audio_attachments:
+            await reaction.message.reply("❌ 音声ファイルが見つかりません。対応形式: " + ", ".join(SUPPORTED_AUDIO_FORMATS))
+            return
+
+        # 処理開始
+        voice_transcriber.processing_messages.add(reaction.message.id)
+
         bot_logger.info(f'音声文字起こし処理開始: {len(audio_attachments)}件 - ユーザー: {user}')
 
         # 処理開始メッセージ
@@ -385,9 +406,17 @@ async def on_reaction_add(reaction, user):
                 )
                 await processing_message.edit(embed=error_embed)
 
+    except Exception as e:
+        print(f'[ERROR] リアクション処理中にエラー: {e}')
+        bot_logger.error(f'リアクション処理エラー: {e}', exc_info=True)
+        try:
+            await reaction.message.reply(f"❌ リアクション処理中にエラーが発生しました: {str(e)}")
+        except:
+            pass
     finally:
         # 処理完了
-        voice_transcriber.processing_messages.discard(reaction.message.id)
+        if voice_transcriber and reaction.message.id in voice_transcriber.processing_messages:
+            voice_transcriber.processing_messages.discard(reaction.message.id)
         bot_logger.info(f'音声文字起こし処理完了 - ユーザー: {user}')
 
 @bot.command(name='voiceinfo')
