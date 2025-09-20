@@ -12,7 +12,7 @@ import tiktoken
 
 load_dotenv()
 
-# ChatGPT連携Discordボット
+# GPT-4連携Discordボット
 intents = discord.Intents.all()
 intents.message_content = True
 intents.guilds = True
@@ -38,9 +38,9 @@ else:
 
 # トークンエンコーダー初期化
 try:
-    # GPT-5用のエンコーダー（GPT-4と同じエンコーダーを使用）
+    # GPT-4用のエンコーダー
     encoding = tiktoken.encoding_for_model("gpt-4")
-    print('[SETUP] Tiktokenエンコーダー初期化完了 (GPT-5対応)')
+    print('[SETUP] Tiktokenエンコーダー初期化完了 (GPT-4対応)')
 except Exception as e:
     print(f'[WARNING] Tiktokenエンコーダー初期化失敗: {e}')
     encoding = None
@@ -50,8 +50,8 @@ class ChatGPTResponder:
         self.client = openai_client
         self.is_responding = False
         self.response_history = []  # 会話履歴を保持
-        self.max_tokens = 1500  # GPT-5用最大応答トークン数
-        self.max_context_tokens = 8000  # GPT-5用コンテキスト最大トークン数（128kの一部）
+        self.max_tokens = 4000  # GPT-4用最大応答トークン数
+        self.max_context_tokens = 8192  # GPT-4用コンテキスト最大トークン数
         self.retry_count = 3  # リトライ回数
         self.rate_limit_delay = 1  # レート制限時の待機時間
         
@@ -89,7 +89,7 @@ class ChatGPTResponder:
         
         for attempt in range(self.retry_count):
             try:
-                print(f'[CHATGPT] {user_name}からのメッセージに応答中 (試行 {attempt + 1}/{self.retry_count}): {user_message[:50]}...')
+                print(f'[GPT-4] {user_name}からのメッセージに応答中 (試行 {attempt + 1}/{self.retry_count}): {user_message[:50]}...')
             
                 # システムメッセージでボットの性格を定義
                 system_message = {
@@ -114,7 +114,7 @@ class ChatGPTResponder:
                 # 会話履歴を含むメッセージを作成
                 messages = [system_message]
                 
-                # 最近の履歴を含める（GPT-5の大きなコンテキストを活用）
+                # 最近の履歴を含める（GPT-4のコンテキストを活用）
                 recent_history = self.response_history[-8:] if self.response_history else []
                 for hist in recent_history:
                     messages.append({"role": "user", "content": hist["user_message"]})
@@ -126,21 +126,17 @@ class ChatGPTResponder:
                 # トークン制限内に履歴を調整
                 messages = self.trim_conversation_history(messages)
             
-                # GPT-5 API呼び出し
+                # GPT-4 Chat Completions API呼び出し
                 response = self.client.chat.completions.create(
-                    model="gpt-5",
+                    model="gpt-4-turbo-preview",
                     messages=messages,
                     max_tokens=self.max_tokens,
                     temperature=0.7,
-                    top_p=0.9,
-                    frequency_penalty=0.2,
-                    presence_penalty=0.2,
-                    user=f"discord_user_{hash(user_name) % 10000}",  # ユーザー識別用
-                    stream=False  # GPT-5では明示的にstream設定を推奨
+                    user=f"discord_user_{hash(user_name) % 10000}"  # ユーザー識別用
                 )
-                
+
                 ai_response = response.choices[0].message.content.strip()
-                
+
                 # 使用量情報をログに記録
                 usage = response.usage
                 print(f'[API] トークン使用量 - 入力: {usage.prompt_tokens}, 出力: {usage.completion_tokens}, 合計: {usage.total_tokens}')
@@ -158,7 +154,7 @@ class ChatGPTResponder:
                 if len(self.response_history) > 10:
                     self.response_history = self.response_history[-10:]
                 
-                print(f'[CHATGPT] 応答生成完了: {ai_response[:50]}...')
+                print(f'[GPT-4] 応答生成完了: {ai_response[:50]}...')
                 return ai_response
                 
             except Exception as e:
@@ -176,13 +172,15 @@ class ChatGPTResponder:
                     return "❌ OpenAI APIの利用枠を超過しました。APIキーの残高を確認してください。"
                 elif "invalid_api_key" in error_message.lower():
                     return "❌ OpenAI APIキーが無効です。設定を確認してください。"
+                elif "model_not_found" in error_message.lower() or "model does not exist" in error_message.lower():
+                    return "❌ GPT-4モデルにアクセスできません。APIキーの権限またはアカウント設定を確認してください。"
                 elif attempt == self.retry_count - 1:  # 最後の試行
-                    return f"❌ ChatGPTとの通信中にエラーが発生しました: {error_type}"
+                    return f"❌ GPT-4との通信中にエラーが発生しました: {error_type}"
                 
                 # リトライ前の短い待機
                 await asyncio.sleep(0.5)
         
-        return "❌ 複数回の試行後もChatGPTとの通信に失敗しました。"
+        return "❌ 複数回の試行後もGPT-4との通信に失敗しました。"
     
     def get_usage_stats(self):
         """使用統計を取得"""
@@ -196,16 +194,16 @@ class ChatGPTResponder:
             "recent_responses": len(recent_responses),
             "total_tokens": total_tokens,
             "recent_tokens": recent_tokens,
-            "estimated_cost_usd": total_tokens * 0.00001  # GPT-5のおおよそのコスト計算（仮定値）
+            "estimated_cost_usd": total_tokens * 0.00001  # GPT-4 Turboのおおよそのコスト計算（仮定値、実際の料金は要確認）
         }
 
-# ChatGPT応答者初期化
+# GPT-4応答者初期化
 chatgpt_responder = ChatGPTResponder(client) if client else None
 
 @bot.event
 async def on_ready():
     print(f'{bot.user} でログイン完了！')
-    print('ChatGPT連携ボットが起動しました')
+    print('GPT-4連携ボットが起動しました')
     print(f'対象チャンネル: {TARGET_CHANNEL_ID}')
     print(f'OpenAI API: {"✅ 設定済み" if client else "❌ 未設定"}')
     
@@ -220,7 +218,7 @@ async def on_ready():
 
 @bot.event
 async def on_message(message):
-    """特定チャンネルのメッセージにChatGPTで自動返答"""
+    """特定チャンネルのメッセージにGPT-4で自動返答"""
     print(f'[DEBUG] メッセージイベント発生: {message.channel.id} vs {TARGET_CHANNEL_ID}')
     print(f'[DEBUG] 送信者: {message.author} (ID: {message.author.id})')
     print(f'[DEBUG] ボット自身: {bot.user} (ID: {bot.user.id if bot.user else "None"})')
@@ -243,10 +241,10 @@ async def on_message(message):
     
     print(f'[DEBUG] 対象チャンネルでメッセージ検出: {message.author} - {message.content[:50]}...')
     
-    # ChatGPTが利用可能かチェック
+    # GPT-4が利用可能かチェック
     if not chatgpt_responder:
-        print(f'[ERROR] ChatGPT機能が利用できません（OpenAI APIキー未設定）')
-        await message.reply("❌ ChatGPT機能が利用できません。OPENAI_API_KEYを設定してください。\n"
+        print(f'[ERROR] GPT-4機能が利用できません（OpenAI APIキー未設定）')
+        await message.reply("❌ GPT-4機能が利用できません。OPENAI_API_KEYを設定してください。\n"
                            "設定方法: `!gptinfo` コマンドで詳細確認")
         return
     
@@ -260,7 +258,7 @@ async def on_message(message):
         
         # タイピング中を表示
         async with message.channel.typing():
-            # ChatGPTに応答生成を依頼
+            # GPT-4に応答生成を依頼
             ai_response = await chatgpt_responder.generate_response(
                 user_message=message.content,
                 user_name=str(message.author),
@@ -273,18 +271,18 @@ async def on_message(message):
             chunks = [ai_response[i:i+1900] for i in range(0, len(ai_response), 1900)]
             for i, chunk in enumerate(chunks):
                 if i == 0:
-                    await message.reply(f"🤖 **ChatGPTからの返答 (1/{len(chunks)})**\n\n{chunk}")
+                    await message.reply(f"🤖 **GPT-4からの返答 (1/{len(chunks)})**\n\n{chunk}")
                 else:
-                    await message.channel.send(f"🤖 **ChatGPTからの返答 ({i+1}/{len(chunks)})**\n\n{chunk}")
+                    await message.channel.send(f"🤖 **GPT-4からの返答 ({i+1}/{len(chunks)})**\n\n{chunk}")
                 
                 # 分割送信の間に短い間隔を空ける
                 if i < len(chunks) - 1:
                     await asyncio.sleep(1)
         else:
             # 通常の返答
-            await message.reply(f"🤖 **ChatGPTからの返答**\n\n{ai_response}")
+            await message.reply(f"🤖 **GPT-4からの返答**\n\n{ai_response}")
         
-        print(f'[SUCCESS] ChatGPT応答送信完了')
+        print(f'[SUCCESS] GPT-4応答送信完了')
         
     except Exception as e:
         print(f'[ERROR] メッセージ処理中にエラー: {e}')
@@ -298,16 +296,16 @@ async def on_message(message):
 
 @bot.command(name='gptinfo')
 async def gpt_info(ctx):
-    """ChatGPT機能の情報を表示"""
+    """GPT-4機能の情報を表示"""
     embed = discord.Embed(
-        title="🤖 ChatGPT連携機能",
-        description="OpenAI ChatGPTと連携したAI応答機能",
+        title="🤖 GPT-4連携機能",
+        description="OpenAI GPT-4と連携したAI応答機能",
         color=0x00ff88
     )
     
     embed.add_field(name="🎯 対象チャンネル", value=f"<#{TARGET_CHANNEL_ID}>", inline=False)
     embed.add_field(name="🔧 動作方式", value="メッセージ投稿 → 自動でChatGPTが返答", inline=False)
-    embed.add_field(name="💡 使用モデル", value="GPT-5 🚀", inline=True)
+    embed.add_field(name="💡 使用モデル", value="GPT-4 Turbo 🚀", inline=True)
     embed.add_field(name="📝 文字数制限", value="2000文字（自動分割対応）", inline=True)
     embed.add_field(name="🧠 記憶機能", value="直近10回の会話を記憶", inline=True)
     
@@ -394,7 +392,7 @@ if __name__ == '__main__':
     DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
     OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
     
-    print('=== ChatGPT連携Discordボット起動中 ===')
+    print('=== GPT-4連携Discordボット起動中 ===')
     print(f'対象チャンネル: {TARGET_CHANNEL_ID}')
     print(f'Discord Token: {"✅ 設定済み" if DISCORD_TOKEN else "❌ 未設定"}')
     print(f'OpenAI API Key: {"✅ 設定済み" if OPENAI_API_KEY else "❌ 未設定"}')
