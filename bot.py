@@ -302,29 +302,32 @@ async def on_message(message):
     print(f'[DEBUG] リプライ確認: {is_reply}')
     print(f'[DEBUG] メッセージ内容あり: {has_content}')
 
-    if has_content and not message.content.startswith('!'):
-        # メッセージをオウム返しする
-        original_message = message.content
-
-        # メンションを除去してクリーンなメッセージを取得
-        clean_message = original_message
-        for mention in message.mentions:
-            clean_message = clean_message.replace(f'<@{mention.id}>', '').strip()
-
-        # 実行環境の情報を追加
-        if os.path.exists('.env'):
-            response = f'{clean_message} (ローカルから) 🏠'
-        else:
-            response = f'{clean_message} (Railwayから) ☁️'
-
-        print(f'[DEBUG] 条件一致、オウム返し: {response}')
-        try:
-            await message.channel.send(response)
-            print('[DEBUG] 返信送信成功')
-        except Exception as e:
-            print(f'[DEBUG] 返信送信エラー: {e}')
-    else:
-        print('[DEBUG] 条件不一致、返信しません（メッセージ内容なしまたはコマンド）')
+    # オウム返し機能は一時的に無効化（ChatGPTボット使用のため）
+    # if has_content and not message.content.startswith('!'):
+    #     # メッセージをオウム返しする
+    #     original_message = message.content
+    #     
+    #     # メンションを除去してクリーンなメッセージを取得
+    #     clean_message = original_message
+    #     for mention in message.mentions:
+    #         clean_message = clean_message.replace(f'<@{mention.id}>', '').strip()
+    #     
+    #     # 実行環境の情報を追加
+    #     if os.path.exists('.env'):
+    #         response = f'{clean_message} (ローカルから) 🏠'
+    #     else:
+    #         response = f'{clean_message} (Railwayから) ☁️'
+    #     
+    #     print(f'[DEBUG] 条件一致、オウム返し: {response}')
+    #     try:
+    #         await message.channel.send(response)
+    #         print('[DEBUG] 返信送信成功')
+    #     except Exception as e:
+    #         print(f'[DEBUG] 返信送信エラー: {e}')
+    # else:
+    #     print('[DEBUG] 条件不一致、返信しません（メッセージ内容なしまたはコマンド）')
+    
+    print('[DEBUG] オウム返し機能は無効化中（ChatGPTボット使用のため）')
 
     await bot.process_commands(message)
 
@@ -688,7 +691,7 @@ async def log_info(ctx):
         description="すべてのチャンネルで利用可能な機能",
         color=0x0099ff
     )
-    embed.add_field(name="💬 メッセージ機能", value="• ボットにメッセージを送る → オウム返し\n• room1でのメッセージ → リアルタイムログに記録", inline=False)
+    embed.add_field(name="💬 メッセージ機能", value="• オウム返し機能: 無効化中\n• room1でのメッセージ → リアルタイムログに記録", inline=False)
     embed.add_field(name="👍 サムズアップ機能", value="• 任意のメッセージに👍リアクション → そのチャンネルの全ログ一括収集", inline=False)
     embed.add_field(name="❤️ ハートマーク機能", value="• room1で❤️リアクション → リアルタイム蓄積ログをダウンロード", inline=False)
     embed.add_field(name="👁️ 目玉マーク機能", value="• 任意のメッセージに👁️リアクション → サーバーメンバー一覧を取得", inline=False)
