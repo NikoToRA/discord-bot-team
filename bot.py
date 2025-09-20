@@ -516,6 +516,116 @@ async def on_raw_reaction_add(payload):
         else:
             print(f'[DEBUG] room1以外でのハートマークなので無視: {payload.channel_id}')
             
+    # 目玉マーク（👁️）リアクション - サーバーメンバー一覧取得
+    elif str(payload.emoji) in ['👁️', '👀', '🔍', '👁‍🗨']:
+        print(f'[DEBUG] RAWイベントで目玉マーク検知: {emoji_str}（メンバー一覧取得）')
+        
+        try:
+            # サーバー（ギルド）取得
+            guild = channel.guild if channel else None
+            if not guild:
+                print(f'[ERROR] サーバー情報が取得できません')
+                return
+                
+            # メンバー一覧取得開始メッセージ
+            await channel.send(f"👁️ **{guild.name}** のメンバー情報収集を開始します！\n"
+                              f"⏳ メンバー数が多い場合は時間がかかります。お待ちください...\n"
+                              f"📊 予想メンバー数: 約{guild.member_count}人")
+            
+            # メンバー情報収集
+            members_data = []
+            total_members = 0
+            
+            async for member in guild.fetch_members(limit=None):
+                member_data = {
+                    'username': str(member),
+                    'display_name': member.display_name,
+                    'user_id': member.id,
+                    'joined_at': member.joined_at.strftime('%Y-%m-%d %H:%M:%S') if member.joined_at else 'Unknown',
+                    'created_at': member.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+                    'status': str(member.status),
+                    'is_bot': member.bot,
+                    'roles': [role.name for role in member.roles if role.name != '@everyone'],
+                    'top_role': member.top_role.name if member.top_role.name != '@everyone' else 'None',
+                    'premium_since': member.premium_since.strftime('%Y-%m-%d %H:%M:%S') if member.premium_since else 'Not boosting'
+                }
+                members_data.append(member_data)
+                total_members += 1
+                
+                # 100人ごとに1秒待機（レート制限対策）
+                if total_members % 100 == 0:
+                    await asyncio.sleep(1)
+            
+            # ファイル作成
+            timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+            filename = f"guild_{guild.id}_members_{timestamp}.txt"
+            filepath = os.path.join(os.getcwd(), filename)
+            
+            with open(filepath, 'w', encoding='utf-8') as f:
+                f.write(f"=== {guild.name} サーバーメンバー一覧 ===\n")
+                f.write(f"取得日時: {datetime.datetime.now().strftime('%Y年%m月%d日 %H時%M分%S秒')}\n")
+                f.write(f"総メンバー数: {len(members_data)}人\n")
+                f.write(f"サーバーID: {guild.id}\n")
+                f.write("=" * 80 + "\n\n")
+                
+                for i, member in enumerate(members_data, 1):
+                    f.write(f"【{i:04d}】 {member['username']}\n")
+                    f.write(f"  表示名: {member['display_name']}\n")
+                    f.write(f"  ユーザーID: {member['user_id']}\n")
+                    f.write(f"  参加日: {member['joined_at']}\n")
+                    f.write(f"  ステータス: {member['status']}\n")
+                    f.write(f"  BOT: {'はい' if member['is_bot'] else 'いいえ'}\n")
+                    f.write(f"  最高ロール: {member['top_role']}\n")
+                    if member['roles']:
+                        f.write(f"  ロール: {', '.join(member['roles'])}\n")
+                    f.write(f"  ブースト: {member['premium_since']}\n")
+                    f.write("-" * 60 + "\n\n")
+                
+                # 統計情報
+                bot_count = sum(1 for member in members_data if member['is_bot'])
+                human_count = len(members_data) - bot_count
+                boosters = sum(1 for member in members_data if member['premium_since'] != 'Not boosting')
+                
+                f.write("=== 統計情報 ===\n")
+                f.write(f"総メンバー数: {len(members_data)}人\n")
+                f.write(f"人間: {human_count}人\n")
+                f.write(f"BOT: {bot_count}人\n")
+                f.write(f"ブースター: {boosters}人\n")
+            
+            # ファイルサイズ確認・アップロード
+            file_size = os.path.getsize(filepath)
+            file_size_mb = file_size / (1024 * 1024)
+            
+            if file_size_mb > 8:
+                await channel.send(f"⚠️ ファイルサイズが大きすぎます ({file_size_mb:.1f}MB)。")
+            else:
+                with open(filepath, 'rb') as f:
+                    discord_file = discord.File(f, filename=os.path.basename(filepath))
+                    
+                    embed = discord.Embed(
+                        title="👁️ サーバーメンバー一覧",
+                        description=f"**{guild.name}** のメンバー情報",
+                        color=0x00bfff
+                    )
+                    
+                    bot_count = sum(1 for member in members_data if member['is_bot'])
+                    human_count = len(members_data) - bot_count
+                    boosters = sum(1 for member in members_data if member['premium_since'] != 'Not boosting')
+                    
+                    embed.add_field(name="📊 総メンバー数", value=f"{len(members_data):,}人", inline=True)
+                    embed.add_field(name="👥 人間", value=f"{human_count:,}人", inline=True)
+                    embed.add_field(name="🤖 BOT", value=f"{bot_count:,}人", inline=True)
+                    embed.add_field(name="💎 ブースター", value=f"{boosters:,}人", inline=True)
+                    embed.add_field(name="📁 ファイルサイズ", value=f"{file_size_mb:.2f}MB", inline=True)
+                    embed.add_field(name="⏰ 取得日時", value=datetime.datetime.now().strftime('%Y/%m/%d %H:%M:%S'), inline=True)
+                    
+                    await channel.send("👁️ **サーバーメンバー一覧をアップロードします！**", embed=embed, file=discord_file)
+                    print(f'[LOG] メンバー一覧ファイルアップロード完了')
+                    
+        except Exception as e:
+            print(f'[ERROR] メンバー一覧取得中にエラー: {e}')
+            await channel.send(f"❌ メンバー一覧取得エラー: {str(e)}")
+            
     else:
         print(f'[DEBUG] RAWイベント: 対象外のリアクション ({emoji_str}) なので無視')
 
@@ -530,8 +640,9 @@ async def log_info(ctx):
     embed.add_field(name="💬 メッセージ機能", value="• ボットにメッセージを送る → オウム返し\n• room1でのメッセージ → リアルタイムログに記録", inline=False)
     embed.add_field(name="👍 サムズアップ機能", value="• 任意のメッセージに👍リアクション → そのチャンネルの全ログ一括収集", inline=False)
     embed.add_field(name="❤️ ハートマーク機能", value="• room1で❤️リアクション → リアルタイム蓄積ログをダウンロード", inline=False)
-    embed.add_field(name="📊 ログ収集内容", value="• 投稿日時・投稿者・メッセージ内容\n• 添付ファイル・リアクション情報", inline=False)
-    embed.add_field(name="⚙️ 仕様", value="• 全ログ収集: 100件ごとに2秒休憩\n• リアルタイムログ: room1専用\n• 8MB以下でDiscordにアップロード", inline=False)
+    embed.add_field(name="👁️ 目玉マーク機能", value="• 任意のメッセージに👁️リアクション → サーバーメンバー一覧を取得", inline=False)
+    embed.add_field(name="📊 収集内容", value="• ログ: 投稿日時・投稿者・メッセージ内容\n• メンバー: ユーザー情報・ロール・統計", inline=False)
+    embed.add_field(name="⚙️ 仕様", value="• 全機能: 8MB以下でDiscordアップロード\n• メンバー数が多いと時間がかかります", inline=False)
     
     await ctx.send(embed=embed)
 
