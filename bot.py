@@ -23,7 +23,7 @@ from features.basic_greeting import handle_basic_greeting
 from features.chatgpt_text import handle_chatgpt_conversation
 from features.room_logging import handle_room_logging, get_room_stats
 from features.guild_info import handle_guild_info_collection, handle_member_collection, get_channel_info
-from features.chat_logging import handle_chat_logging, collect_all_channels_history
+from features.chat_logging import handle_chat_logging, collect_all_channels_history, handle_chat_collection_reaction, auto_add_chat_collect_reaction
 
 # 環境変数を読み込み
 load_dotenv()
@@ -106,6 +106,11 @@ async def on_reaction_add(reaction, user):
         print(f"[DEBUG] 🎤音声文字起こし開始")
         await handle_voice_transcription(message, bot)
 
+    # 📜 チャット履歴収集機能
+    if FEATURES['chat_logging'] and emoji_str == REACTION_EMOJIS['chat_collect']:
+        print(f"[DEBUG] 📜チャット履歴収集開始")
+        await handle_chat_collection_reaction(message, bot)
+
 @bot.event
 async def on_message(message):
     """メッセージ受信時の処理"""
@@ -133,6 +138,12 @@ async def on_message(message):
     if FEATURES['chatgpt_voice']:
         if await auto_add_voice_reaction(message):
             reaction_added = True
+
+    # チャット収集キーワードに自動で📜リアクション
+    if FEATURES['chat_logging']:
+        if await auto_add_chat_collect_reaction(message):
+            reaction_added = True
+            print(f'[DEBUG] 📜リアクション追加完了')
 
     # ログ機能処理
     # ルームログ機能

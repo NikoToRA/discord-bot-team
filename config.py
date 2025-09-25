@@ -20,6 +20,7 @@ FEATURES = {
 REACTION_EMOJIS = {
     'image_ocr': '🦀',             # 画像文字起こし
     'voice_transcribe': '🎤',      # 音声文字起こし
+    'chat_collect': '📜',          # チャット履歴収集
     'processing': '⏳',            # 処理中
     'success': '✅',               # 成功
     'error': '❌',                 # エラー

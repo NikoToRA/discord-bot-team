@@ -121,3 +121,48 @@ async def collect_all_channels_history(bot, guild):
     except Exception as e:
         print(f"全履歴収集エラー: {e}")
         return 0
+
+async def handle_chat_collection_reaction(message, bot):
+    """📜リアクションによるチャット履歴収集処理"""
+    from config import REACTION_EMOJIS
+
+    try:
+        # 処理開始を通知
+        await message.add_reaction(REACTION_EMOJIS['processing'])
+
+        # ギルドの全チャンネル履歴を収集
+        collected_count = await collect_all_channels_history(bot, message.guild)
+
+        # 結果を送信
+        if collected_count > 0:
+            await message.reply(f"**📜 チャット履歴収集完了:**\n`{collected_count}チャンネル`の履歴を収集し、JSONファイルとして保存しました。")
+        else:
+            await message.reply("チャット履歴の収集に失敗しました。権限を確認してください。")
+
+        # 処理完了を通知
+        await message.remove_reaction(REACTION_EMOJIS['processing'], bot.user)
+        await message.add_reaction(REACTION_EMOJIS['success'])
+        return True
+
+    except Exception as e:
+        print(f"チャット収集処理エラー: {str(e)}")
+        await message.reply("チャット履歴収集中にエラーが発生しました。")
+        await message.remove_reaction(REACTION_EMOJIS['processing'], bot.user)
+        await message.add_reaction(REACTION_EMOJIS['error'])
+        return False
+
+async def auto_add_chat_collect_reaction(message):
+    """特定のキーワードメッセージに自動で📜リアクションを追加"""
+    from config import BOT_CONFIG, REACTION_EMOJIS
+
+    # 指定チャンネルのみで動作
+    if message.channel.id != BOT_CONFIG.get('target_channel_id'):
+        return False
+
+    # 特定のキーワードでチャット収集をトリガー
+    trigger_keywords = ['チャット収集', 'ログ収集', 'chat collect', 'collect', '履歴収集', 'history']
+    if message.content and any(keyword in message.content.lower() for keyword in trigger_keywords):
+        print(f"[DEBUG] 📜リアクション追加: チャット収集トリガー")
+        await message.add_reaction(REACTION_EMOJIS['chat_collect'])
+        return True
+    return False
