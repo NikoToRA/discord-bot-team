@@ -14,6 +14,10 @@ async def get_chatgpt_response(user_message):
         if not OPENAI_API_KEY:
             return "OpenAI APIキーが設定されていません。"
 
+        # APIキーをクリーンアップ（改行や空白を除去）
+        OPENAI_API_KEY = OPENAI_API_KEY.strip().replace('\n', '').replace(' ', '')
+        print(f"[DEBUG] OpenAI APIキー長: {len(OPENAI_API_KEY)}")
+
         # OpenAIクライアントを初期化
         client = OpenAI(api_key=OPENAI_API_KEY)
 
