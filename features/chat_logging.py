@@ -125,17 +125,31 @@ async def collect_all_channels_history(bot, guild):
 async def handle_chat_collection_reaction(message, bot):
     """📜リアクションによるチャット履歴収集処理"""
     from config import REACTION_EMOJIS
+    import discord
 
     try:
         # 処理開始を通知
         await message.add_reaction(REACTION_EMOJIS['processing'])
 
         # ギルドの全チャンネル履歴を収集
-        collected_count = await collect_all_channels_history(bot, message.guild)
+        collected_files = await collect_all_channels_history_with_files(bot, message.guild)
 
         # 結果を送信
-        if collected_count > 0:
-            await message.reply(f"**📜 チャット履歴収集完了:**\n`{collected_count}チャンネル`の履歴を収集し、JSONファイルとして保存しました。")
+        if collected_files:
+            await message.reply(f"**📜 チャット履歴収集完了:**\n`{len(collected_files)}チャンネル`の履歴を収集しました。")
+
+            # 収集したファイルをDiscordに送信
+            for file_path in collected_files[:5]:  # 最大5ファイルまで送信
+                try:
+                    if os.path.exists(file_path):
+                        with open(file_path, 'rb') as f:
+                            discord_file = discord.File(f, filename=os.path.basename(file_path))
+                            await message.channel.send(f"**📁 {os.path.basename(file_path)}:**", file=discord_file)
+                except Exception as e:
+                    print(f"ファイル送信エラー ({file_path}): {e}")
+
+            if len(collected_files) > 5:
+                await message.channel.send(f"**注意:** {len(collected_files) - 5}個のファイルは制限により表示されていません。")
         else:
             await message.reply("チャット履歴の収集に失敗しました。権限を確認してください。")
 
@@ -150,6 +164,33 @@ async def handle_chat_collection_reaction(message, bot):
         await message.remove_reaction(REACTION_EMOJIS['processing'], bot.user)
         await message.add_reaction(REACTION_EMOJIS['error'])
         return False
+
+async def collect_all_channels_history_with_files(bot, guild):
+    """ギルドの全チャンネル履歴を収集してファイルパスリストを返す"""
+    try:
+        collected_files = []
+
+        for channel in guild.text_channels:
+            try:
+                # 権限確認
+                if not channel.permissions_for(guild.me).read_message_history:
+                    continue
+
+                messages_data = await chat_logger.collect_channel_history(channel, limit=50)
+                if messages_data:
+                    file_path = chat_logger.save_chat_log(channel, messages_data)
+                    if file_path:
+                        collected_files.append(file_path)
+
+            except Exception as e:
+                print(f"チャンネル処理エラー ({channel.name}): {e}")
+
+        print(f"全チャンネル履歴収集完了: {len(collected_files)}ファイル作成")
+        return collected_files
+
+    except Exception as e:
+        print(f"全履歴収集エラー: {e}")
+        return []
 
 async def auto_add_chat_collect_reaction(message):
     """特定のキーワードメッセージに自動で📜リアクションを追加"""
