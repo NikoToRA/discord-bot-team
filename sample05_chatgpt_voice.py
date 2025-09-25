@@ -218,105 +218,94 @@ async def on_message(message):
 
     print(f'[MESSAGE] 対象チャンネルでのメッセージ - 添付ファイル数: {len(message.attachments)}')
 
-    # 音声ファイルが添付されているかチェック
+    # 音声ファイルが添付されているかチェック（ログのみ）
     audio_attachments = []
     for attachment in message.attachments:
         if voice_transcriber and voice_transcriber.is_audio_file(attachment.filename):
             audio_attachments.append(attachment)
 
     if audio_attachments:
-        bot_logger.info(f'音声ファイル検出: {len(audio_attachments)}件 - ユーザー: {message.author}')
-
-        # 案内メッセージを送信
-        embed = discord.Embed(
-            title="🎵 音声ファイルを検出しました",
-            description=f"文字起こしを開始するには {TRANSCRIBE_EMOJI} リアクションを押してください",
-            color=0x00aaff
-        )
-
-        for attachment in audio_attachments:
-            embed.add_field(
-                name="📁 ファイル名",
-                value=f"`{attachment.filename}`",
-                inline=False
-            )
-            embed.add_field(
-                name="📏 ファイルサイズ",
-                value=f"{attachment.size / 1024:.1f} KB",
-                inline=True
-            )
-
-        embed.add_field(
-            name="🔧 使用モデル",
-            value="GPT-4o Transcribe",
-            inline=True
-        )
-        embed.add_field(
-            name="🌐 対応言語",
-            value="日本語最適化",
-            inline=True
-        )
-
-        guide_message = await message.reply(embed=embed)
-
-        # 自動でリアクションを追加
-        await guide_message.add_reaction(TRANSCRIBE_EMOJI)
+        bot_logger.info(f'音声ファイル検出: {len(audio_attachments)}件 - ユーザー: {message.author} (リアクション待機中)')
 
     # コマンドも処理
     await bot.process_commands(message)
 
 @bot.event
-async def on_reaction_add(reaction, user):
-    """リアクション追加時の処理"""
-    print(f'[REACTION] リアクション検出: {reaction.emoji} by {user} on {reaction.message.id}')
-    print(f'[REACTION] チャンネル: {reaction.message.channel.id}, 絵文字タイプ: {type(reaction.emoji)}')
-    bot_logger.info(f'リアクション追加: {reaction.emoji} by {user} on {reaction.message.id} in channel {reaction.message.channel.id}')
+async def on_raw_reaction_add(payload):
+    """生のリアクション追加イベント（メッセージキャッシュに依存しない）"""
+    print(f'[RAW_REACTION] 生リアクション検出: {payload.emoji} by {payload.user_id} on {payload.message_id}')
+    print(f'[RAW_REACTION] チャンネル: {payload.channel_id}, ギルド: {payload.guild_id}')
+    bot_logger.info(f'生リアクション追加: {payload.emoji} by {payload.user_id} on {payload.message_id} in channel {payload.channel_id}')
 
-    # 全ての処理ステップをログ出力
     try:
         # ボット自身のリアクションは無視
-        if user == bot.user:
-            print(f'[REACTION] ボット自身のリアクションなのでスキップ')
+        if payload.user_id == bot.user.id:
+            print(f'[RAW_REACTION] ボット自身のリアクションなのでスキップ')
             bot_logger.debug('ボット自身のリアクションなのでスキップ')
             return
 
         # 対象チャンネル以外は無視
-        if reaction.message.channel.id != TARGET_CHANNEL_ID:
-            print(f'[REACTION] 対象外チャンネル ({reaction.message.channel.id}) なのでスキップ')
-            bot_logger.debug(f'対象外チャンネル ({reaction.message.channel.id}) なのでスキップ')
+        if payload.channel_id != TARGET_CHANNEL_ID:
+            print(f'[RAW_REACTION] 対象外チャンネル ({payload.channel_id}) なのでスキップ')
+            bot_logger.debug(f'対象外チャンネル ({payload.channel_id}) なのでスキップ')
             return
 
         # 文字起こしリアクションかチェック
-        print(f'[REACTION] リアクション絵文字チェック: "{str(reaction.emoji)}" vs "{TRANSCRIBE_EMOJI}"')
-        if str(reaction.emoji) != TRANSCRIBE_EMOJI:
-            print(f'[REACTION] 対象外リアクション ({str(reaction.emoji)}) なのでスキップ')
-            bot_logger.debug(f'対象外リアクション ({str(reaction.emoji)}) なのでスキップ')
+        print(f'[RAW_REACTION] リアクション絵文字チェック: "{str(payload.emoji)}" vs "{TRANSCRIBE_EMOJI}"')
+        if str(payload.emoji) != TRANSCRIBE_EMOJI:
+            print(f'[RAW_REACTION] 対象外リアクション ({str(payload.emoji)}) なのでスキップ')
+            bot_logger.debug(f'対象外リアクション ({str(payload.emoji)}) なのでスキップ')
             return
 
-        print(f'[REACTION] 🔄リアクション検出！処理開始')
+        print(f'[RAW_REACTION] 🔄リアクション検出！処理開始')
 
         # 音声文字起こし機能が無効な場合
         if not voice_transcriber:
-            await reaction.message.reply("❌ 音声文字起こし機能が利用できません。OPENAI_API_KEYを設定してください。")
+            channel = bot.get_channel(payload.channel_id)
+            if channel:
+                message = await channel.fetch_message(payload.message_id)
+                await message.reply("❌ 音声文字起こし機能が利用できません。OPENAI_API_KEYを設定してください。")
             return
 
         # 既に処理中の場合
-        if reaction.message.id in voice_transcriber.processing_messages:
-            await reaction.message.reply("⏳ この音声ファイルは既に処理中です。少しお待ちください。")
+        if payload.message_id in voice_transcriber.processing_messages:
+            channel = bot.get_channel(payload.channel_id)
+            if channel:
+                message = await channel.fetch_message(payload.message_id)
+                await message.reply("⏳ この音声ファイルは既に処理中です。少しお待ちください。")
+            return
+
+        # チャンネルとメッセージを取得
+        channel = bot.get_channel(payload.channel_id)
+        if not channel:
+            print(f'[RAW_REACTION] チャンネルが見つかりません: {payload.channel_id}')
+            bot_logger.warning(f'チャンネルが見つかりません: {payload.channel_id}')
+            return
+
+        message = await channel.fetch_message(payload.message_id)
+        if not message:
+            print(f'[RAW_REACTION] メッセージが見つかりません: {payload.message_id}')
+            bot_logger.warning(f'メッセージが見つかりません: {payload.message_id}')
+            return
+
+        # ユーザーを取得
+        user = bot.get_user(payload.user_id)
+        if not user:
+            print(f'[RAW_REACTION] ユーザーが見つかりません: {payload.user_id}')
+            bot_logger.warning(f'ユーザーが見つかりません: {payload.user_id}')
             return
 
         # 元のメッセージ（音声ファイルが添付されたメッセージ）を取得
-        original_message = None
+        original_message = message
 
-        # リアクションされたメッセージが返信の場合、元メッセージを取得
-        if reaction.message.reference and reaction.message.reference.message_id:
+        # まず直接リアクションされたメッセージをチェック
+        if not original_message.attachments and message.reference and message.reference.message_id:
             try:
-                original_message = await reaction.message.channel.fetch_message(reaction.message.reference.message_id)
+                # 返信元のメッセージもチェック
+                original_message = await channel.fetch_message(message.reference.message_id)
             except discord.NotFound:
-                await reaction.message.reply("❌ 元のメッセージが見つかりません。")
-                return
-        else:
-            original_message = reaction.message
+                # 元メッセージが見つからない場合はリアクションされたメッセージを使用
+                original_message = message
 
         # 音声ファイルをチェック
         audio_attachments = []
@@ -325,11 +314,13 @@ async def on_reaction_add(reaction, user):
                 audio_attachments.append(attachment)
 
         if not audio_attachments:
-            await reaction.message.reply("❌ 音声ファイルが見つかりません。対応形式: " + ", ".join(SUPPORTED_AUDIO_FORMATS))
+            # 音声ファイルが見つからない場合は静かに無視（エラーメッセージなし）
+            print(f'[DEBUG] 音声ファイルが見つかりません: {original_message.id}')
+            bot_logger.debug(f'音声ファイルなし - メッセージID: {original_message.id}')
             return
 
         # 処理開始
-        voice_transcriber.processing_messages.add(reaction.message.id)
+        voice_transcriber.processing_messages.add(message.id)
 
         bot_logger.info(f'音声文字起こし処理開始: {len(audio_attachments)}件 - ユーザー: {user}')
 
@@ -339,7 +330,7 @@ async def on_reaction_add(reaction, user):
             description="音声ファイルを分析しています。しばらくお待ちください。",
             color=0xffaa00
         )
-        processing_message = await reaction.message.reply(embed=processing_embed)
+        processing_message = await message.reply(embed=processing_embed)
 
         # 各音声ファイルを処理
         for i, attachment in enumerate(audio_attachments):
@@ -391,7 +382,7 @@ async def on_reaction_add(reaction, user):
                             description=f"```\n{chunk}\n```",
                             color=0x00ff00
                         )
-                        await reaction.message.channel.send(embed=chunk_embed)
+                        await channel.send(embed=chunk_embed)
 
                         # 分割送信の間に短い間隔を空ける
                         if j < len(chunks) - 1:
@@ -407,17 +398,26 @@ async def on_reaction_add(reaction, user):
                 await processing_message.edit(embed=error_embed)
 
     except Exception as e:
-        print(f'[ERROR] リアクション処理中にエラー: {e}')
-        bot_logger.error(f'リアクション処理エラー: {e}', exc_info=True)
+        print(f'[ERROR] 生リアクション処理中にエラー: {e}')
+        bot_logger.error(f'生リアクション処理エラー: {e}', exc_info=True)
         try:
-            await reaction.message.reply(f"❌ リアクション処理中にエラーが発生しました: {str(e)}")
+            channel = bot.get_channel(payload.channel_id)
+            if channel:
+                message = await channel.fetch_message(payload.message_id)
+                await message.reply(f"❌ リアクション処理中にエラーが発生しました: {str(e)}")
         except:
             pass
     finally:
         # 処理完了
-        if voice_transcriber and reaction.message.id in voice_transcriber.processing_messages:
-            voice_transcriber.processing_messages.discard(reaction.message.id)
-        bot_logger.info(f'音声文字起こし処理完了 - ユーザー: {user}')
+        if voice_transcriber and payload.message_id in voice_transcriber.processing_messages:
+            voice_transcriber.processing_messages.discard(payload.message_id)
+        bot_logger.info(f'音声文字起こし処理完了 - ユーザー: {payload.user_id}')
+
+@bot.event
+async def on_reaction_add(reaction, user):
+    """リアクション追加時の処理（キャッシュされたメッセージ用）"""
+    # この関数は主に最近のメッセージ用のフォールバックとして残しておく
+    # 基本的にon_raw_reaction_addで処理される
 
 @bot.command(name='voiceinfo')
 async def voice_info(ctx):
