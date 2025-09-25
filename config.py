@@ -3,17 +3,17 @@ Discord Bot Configuration
 機能のON/OFF制御とボット設定
 """
 
-# 機能のON/OFF設定
+# 機能のON/OFF設定 - 最小構成テスト
 FEATURES = {
-    'basic_greeting': False,        # 基本的な挨拶機能（競合するため無効）
-    'chatgpt_text': True,           # ChatGPT テキスト会話
-    'chatgpt_voice': True,          # ChatGPT 音声文字起こし
-    'chatgpt_image_ocr': True,      # ChatGPT 画像文字起こし (🦀)
-    'room_logging': True,           # ルームログ機能
-    'guild_info': True,             # ギルド情報取得
-    'chat_logging': True,           # チャットログ収集
-    'member_collection': True,      # ルームメンバー収集
-    'debug_logging': True,          # デバッグログ
+    'basic_greeting': False,        # 無効
+    'chatgpt_text': False,          # 無効
+    'chatgpt_voice': False,         # 無効
+    'chatgpt_image_ocr': True,      # これのみテスト
+    'room_logging': False,          # 無効
+    'guild_info': False,            # 無効
+    'chat_logging': False,          # 無効
+    'member_collection': False,     # 無効
+    'debug_logging': True,          # デバッグ有効
 }
 
 # リアクション絵文字設定
@@ -36,7 +36,8 @@ CHATGPT_CONFIG = {
 # ボット設定
 BOT_CONFIG = {
     'command_prefix': '!',
-    'debug_level': 'INFO',  # DEBUG, INFO, WARNING, ERROR
+    'debug_level': 'DEBUG',         # デバッグレベル最大
     'intents_reactions': True,
     'intents_voice_states': True,
+    'target_channel_id': 1418512165165465600,  # 対象チャンネル指定
 }

@@ -89,12 +89,21 @@ async def on_reaction_add(reaction, user):
     message = reaction.message
     emoji_str = str(reaction.emoji)
 
+    # 指定チャンネルのみで動作
+    if message.channel.id != BOT_CONFIG.get('target_channel_id'):
+        print(f"[DEBUG] リアクション対象外チャンネル: {message.channel.id}")
+        return
+
+    print(f"[DEBUG] リアクション検知: {emoji_str} by {user.name} in {message.channel.name}")
+
     # 🦀 画像文字起こし機能
     if FEATURES['chatgpt_image_ocr'] and emoji_str == REACTION_EMOJIS['image_ocr']:
+        print(f"[DEBUG] 🦀画像文字起こし開始")
         await handle_image_ocr_reaction(message, bot)
 
     # 🎤 音声文字起こし機能
     if FEATURES['chatgpt_voice'] and emoji_str == REACTION_EMOJIS['voice_transcribe']:
+        print(f"[DEBUG] 🎤音声文字起こし開始")
         await handle_voice_transcription(message, bot)
 
 @bot.event
@@ -103,9 +112,13 @@ async def on_message(message):
     if message.author == bot.user:
         return
 
+    # 指定チャンネルのみで処理
+    if message.channel.id != BOT_CONFIG.get('target_channel_id'):
+        return
+
     # デバッグログ出力
     if FEATURES['debug_logging']:
-        print(f'[DEBUG] メッセージ: {message.author} -> "{message.content[:50]}..."')
+        print(f'[DEBUG] 対象チャンネルメッセージ: {message.author} -> "{message.content[:50]}..." in {message.channel.name}')
 
     # 自動リアクション追加
     reaction_added = False
@@ -114,6 +127,7 @@ async def on_message(message):
     if FEATURES['chatgpt_image_ocr']:
         if await auto_add_image_reaction(message):
             reaction_added = True
+            print(f'[DEBUG] 🦀リアクション追加完了')
 
     # 音声に自動で🎤リアクション
     if FEATURES['chatgpt_voice']:

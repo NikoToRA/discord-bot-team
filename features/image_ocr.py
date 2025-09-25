@@ -103,9 +103,17 @@ async def handle_image_ocr_reaction(message, bot):
 
 async def auto_add_image_reaction(message):
     """画像が添付されたメッセージに自動で🦀リアクションを追加"""
+    from config import BOT_CONFIG
+
+    # 指定チャンネルのみで動作
+    if message.channel.id != BOT_CONFIG.get('target_channel_id'):
+        print(f"[DEBUG] 対象チャンネル外: {message.channel.id} != {BOT_CONFIG.get('target_channel_id')}")
+        return False
+
     if message.attachments:
         for attachment in message.attachments:
             if any(attachment.filename.lower().endswith(ext) for ext in ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp']):
+                print(f"[DEBUG] 🦀リアクション追加: {attachment.filename}")
                 await message.add_reaction(REACTION_EMOJIS['image_ocr'])
                 return True
     return False
