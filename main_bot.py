@@ -117,17 +117,16 @@ async def on_message(message):
         if await auto_add_voice_reaction(message):
             reaction_added = True
 
-    # メッセージ処理（リアクション追加済みの場合は基本挨拶をスキップ）
-    if not reaction_added:
-        # ChatGPTテキスト会話機能
-        if FEATURES['chatgpt_text']:
-            if await handle_chatgpt_conversation(message):
-                await bot.process_commands(message)
-                return
+    # メッセージ処理
+    # ChatGPTテキスト会話機能
+    if FEATURES['chatgpt_text']:
+        if await handle_chatgpt_conversation(message):
+            await bot.process_commands(message)
+            return
 
-        # 基本的な挨拶機能
-        if FEATURES['basic_greeting']:
-            await handle_basic_greeting(message)
+    # 基本的な挨拶機能（リアクション追加されていない場合のみ）
+    if FEATURES['basic_greeting'] and not reaction_added:
+        await handle_basic_greeting(message)
 
     await bot.process_commands(message)
 
