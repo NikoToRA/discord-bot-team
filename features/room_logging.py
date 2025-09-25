@@ -8,11 +8,15 @@ import datetime
 import json
 from config import BOT_CONFIG
 
-# 対象ルームID（設定可能）
-TARGET_ROOM_ID = 1418511738046779393
+# 対象ルームIDは設定ファイルから取得
+def get_target_room_id():
+    from config import BOT_CONFIG
+    return BOT_CONFIG.get('target_channel_id', 1418512165165465600)
 
 class RoomLogger:
-    def __init__(self, room_id=TARGET_ROOM_ID):
+    def __init__(self, room_id=None):
+        if room_id is None:
+            room_id = get_target_room_id()
         self.room_id = room_id
         self.log_dir = "logs"
         if not os.path.exists(self.log_dir):
@@ -78,7 +82,8 @@ room_logger = RoomLogger()
 
 async def handle_room_logging(message):
     """ルームログ処理のメイン関数"""
-    if message.channel.id != TARGET_ROOM_ID:
+    target_id = get_target_room_id()
+    if message.channel.id != target_id:
         return False
 
     try:
@@ -99,3 +104,68 @@ async def get_room_stats():
     except Exception as e:
         print(f"統計取得エラー: {e}")
         return None
+
+async def handle_room_stats_reaction(message, bot):
+    """📊リアクションによるルーム統計表示とログファイル送信"""
+    from config import REACTION_EMOJIS
+    import discord
+
+    try:
+        # 処理開始を通知
+        await message.add_reaction(REACTION_EMOJIS['processing'])
+
+        # 統計情報を取得
+        stats = await get_room_stats()
+
+        if stats:
+            # 統計情報を表示
+            stats_text = f"**📊 ルーム統計情報:**\n"
+            stats_text += f"・メッセージ数: {stats['message_count']}\n"
+            stats_text += f"・ユニークユーザー数: {len(stats['unique_users'])}\n"
+            stats_text += f"・最終更新: {stats['last_updated'][:19]}\n"
+
+            await message.reply(stats_text)
+
+            # ログファイルをDiscordに送信
+            try:
+                if os.path.exists(room_logger.log_file):
+                    with open(room_logger.log_file, 'rb') as f:
+                        discord_file = discord.File(f, filename=f"room_{room_logger.room_id}_log.txt")
+                        await message.channel.send("**📁 ルームログファイル:**", file=discord_file)
+
+                if os.path.exists(room_logger.metadata_file):
+                    with open(room_logger.metadata_file, 'rb') as f:
+                        discord_file = discord.File(f, filename=f"room_{room_logger.room_id}_metadata.json")
+                        await message.channel.send("**📁 統計メタデータ:**", file=discord_file)
+            except Exception as e:
+                print(f"ログファイル送信エラー: {e}")
+        else:
+            await message.reply("ルーム統計の取得に失敗しました。")
+
+        # 処理完了を通知
+        await message.remove_reaction(REACTION_EMOJIS['processing'], bot.user)
+        await message.add_reaction(REACTION_EMOJIS['success'])
+        return True
+
+    except Exception as e:
+        print(f"ルーム統計処理エラー: {str(e)}")
+        await message.reply("ルーム統計の処理中にエラーが発生しました。")
+        await message.remove_reaction(REACTION_EMOJIS['processing'], bot.user)
+        await message.add_reaction(REACTION_EMOJIS['error'])
+        return False
+
+async def auto_add_room_stats_reaction(message):
+    """特定のキーワードメッセージに自動で📊リアクションを追加"""
+    from config import BOT_CONFIG, REACTION_EMOJIS
+
+    # 指定チャンネルのみで動作
+    if message.channel.id != BOT_CONFIG.get('target_channel_id'):
+        return False
+
+    # 特定のキーワードでルーム統計をトリガー
+    trigger_keywords = ['ルーム統計', 'room stats', '統計', 'stats', 'ログ統計', '部屋統計']
+    if message.content and any(keyword in message.content.lower() for keyword in trigger_keywords):
+        print(f"[DEBUG] 📊リアクション追加: ルーム統計トリガー")
+        await message.add_reaction(REACTION_EMOJIS['room_stats'])
+        return True
+    return False

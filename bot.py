@@ -21,7 +21,7 @@ from features.image_ocr import handle_image_ocr_reaction, auto_add_image_reactio
 from features.voice_transcribe import handle_voice_transcription, auto_add_voice_reaction
 from features.basic_greeting import handle_basic_greeting
 from features.chatgpt_text import handle_chatgpt_conversation
-from features.room_logging import handle_room_logging, get_room_stats
+from features.room_logging import handle_room_logging, get_room_stats, handle_room_stats_reaction, auto_add_room_stats_reaction
 from features.guild_info import handle_guild_info_collection, handle_member_collection, get_channel_info
 from features.chat_logging import handle_chat_logging, collect_all_channels_history, handle_chat_collection_reaction, auto_add_chat_collect_reaction
 
@@ -111,6 +111,11 @@ async def on_reaction_add(reaction, user):
         print(f"[DEBUG] 📜チャット履歴収集開始")
         await handle_chat_collection_reaction(message, bot)
 
+    # 📊 ルーム統計表示機能
+    if FEATURES['room_logging'] and emoji_str == REACTION_EMOJIS['room_stats']:
+        print(f"[DEBUG] 📊ルーム統計表示開始")
+        await handle_room_stats_reaction(message, bot)
+
 @bot.event
 async def on_message(message):
     """メッセージ受信時の処理"""
@@ -144,6 +149,12 @@ async def on_message(message):
         if await auto_add_chat_collect_reaction(message):
             reaction_added = True
             print(f'[DEBUG] 📜リアクション追加完了')
+
+    # ルーム統計キーワードに自動で📊リアクション
+    if FEATURES['room_logging']:
+        if await auto_add_room_stats_reaction(message):
+            reaction_added = True
+            print(f'[DEBUG] 📊リアクション追加完了')
 
     # ログ機能処理
     # ルームログ機能
