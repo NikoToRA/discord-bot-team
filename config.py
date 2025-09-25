@@ -5,12 +5,14 @@ Discord Bot Configuration
 
 # 機能のON/OFF設定
 FEATURES = {
-    'basic_greeting': False,        # 基本的な挨拶機能（無効化）
-    'chatgpt_text': False,          # ChatGPT テキスト会話（無効化）
+    'basic_greeting': False,        # 基本的な挨拶機能（競合するため無効）
+    'chatgpt_text': True,           # ChatGPT テキスト会話
     'chatgpt_voice': True,          # ChatGPT 音声文字起こし
     'chatgpt_image_ocr': True,      # ChatGPT 画像文字起こし (🦀)
-    'room_logging': False,          # ルームログ機能
-    'guild_info': False,            # ギルド情報取得
+    'room_logging': True,           # ルームログ機能
+    'guild_info': True,             # ギルド情報取得
+    'chat_logging': True,           # チャットログ収集
+    'member_collection': True,      # ルームメンバー収集
     'debug_logging': True,          # デバッグログ
 }
 

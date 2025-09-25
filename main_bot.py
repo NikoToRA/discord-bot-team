@@ -21,6 +21,9 @@ from features.image_ocr import handle_image_ocr_reaction, auto_add_image_reactio
 from features.voice_transcribe import handle_voice_transcription, auto_add_voice_reaction
 from features.basic_greeting import handle_basic_greeting
 from features.chatgpt_text import handle_chatgpt_conversation
+from features.room_logging import handle_room_logging, get_room_stats
+from features.guild_info import handle_guild_info_collection, handle_member_collection, get_channel_info
+from features.chat_logging import handle_chat_logging, collect_all_channels_history
 
 # 環境変数を読み込み
 load_dotenv()
@@ -117,6 +120,15 @@ async def on_message(message):
         if await auto_add_voice_reaction(message):
             reaction_added = True
 
+    # ログ機能処理
+    # ルームログ機能
+    if FEATURES['room_logging']:
+        await handle_room_logging(message)
+
+    # チャットログ機能
+    if FEATURES['chat_logging']:
+        await handle_chat_logging(message)
+
     # メッセージ処理
     # ChatGPTテキスト会話機能
     if FEATURES['chatgpt_text']:
@@ -159,6 +171,59 @@ async def show_reactions(ctx):
         embed.add_field(name=f"{emoji} {key}", value=desc, inline=True)
 
     await ctx.send(embed=embed)
+
+@bot.command(name='room_stats')
+async def show_room_stats(ctx):
+    """ルーム統計を表示"""
+    if not FEATURES['room_logging']:
+        await ctx.send("❌ ルームログ機能が無効です。")
+        return
+
+    stats = await get_room_stats()
+    if stats:
+        embed = discord.Embed(title="📊 ルーム統計", color=0x00ff00)
+        embed.add_field(name="メッセージ数", value=stats['message_count'], inline=True)
+        embed.add_field(name="ユニークユーザー数", value=len(stats['unique_users']), inline=True)
+        embed.add_field(name="最終更新", value=stats['last_updated'][:19], inline=False)
+        await ctx.send(embed=embed)
+    else:
+        await ctx.send("❌ 統計データの取得に失敗しました。")
+
+@bot.command(name='collect_guild_info')
+async def collect_guild_info_command(ctx):
+    """ギルド情報を収集"""
+    if not FEATURES['guild_info']:
+        await ctx.send("❌ ギルド情報機能が無効です。")
+        return
+
+    try:
+        guild = ctx.guild
+        guild_info = await handle_guild_info_collection(bot, guild)
+        members_info = await handle_member_collection(guild)
+        channels_info = await get_channel_info(guild)
+
+        embed = discord.Embed(title="🏛️ ギルド情報収集完了", color=0x00ff00)
+        embed.add_field(name="サーバー名", value=guild.name, inline=True)
+        embed.add_field(name="メンバー数", value=guild.member_count, inline=True)
+        embed.add_field(name="収集メンバー数", value=len(members_info), inline=True)
+        embed.add_field(name="チャンネル数", value=len(channels_info), inline=True)
+        await ctx.send(embed=embed)
+
+    except Exception as e:
+        await ctx.send(f"❌ ギルド情報収集エラー: {e}")
+
+@bot.command(name='collect_chat_history')
+async def collect_chat_history_command(ctx):
+    """チャット履歴を収集"""
+    if not FEATURES['chat_logging']:
+        await ctx.send("❌ チャットログ機能が無効です。")
+        return
+
+    try:
+        count = await collect_all_channels_history(bot, ctx.guild)
+        await ctx.send(f"✅ チャット履歴収集完了: {count}チャンネル")
+    except Exception as e:
+        await ctx.send(f"❌ チャット履歴収集エラー: {e}")
 
 def main():
     """メイン実行関数"""
