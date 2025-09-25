@@ -11,7 +11,7 @@ FEATURES = {
     'chatgpt_image_ocr': True,      # 有効
     'room_logging': False,          # 無効
     'guild_info': False,            # 無効
-    'chat_logging': False,          # 無効
+    'chat_logging': True,           # 有効化
     'member_collection': False,     # 無効
     'debug_logging': True,          # デバッグ有効
 }
