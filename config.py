@@ -10,9 +10,9 @@ FEATURES = {
     'chatgpt_voice': True,          # 有効化
     'chatgpt_image_ocr': True,      # 有効
     'room_logging': True,           # 有効化
-    'guild_info': False,            # 無効
+    'guild_info': True,             # 有効化
     'chat_logging': True,           # 有効化
-    'member_collection': False,     # 無効
+    'member_collection': True,      # 有効化
     'debug_logging': True,          # デバッグ有効
 }
 
@@ -22,6 +22,7 @@ REACTION_EMOJIS = {
     'voice_transcribe': '🎤',      # 音声文字起こし
     'chat_collect': '📜',          # チャット履歴収集
     'room_stats': '📊',            # ルーム統計表示
+    'guild_info': '🏛️',            # ギルド情報収集
     'processing': '⏳',            # 処理中
     'success': '✅',               # 成功
     'error': '❌',                 # エラー
