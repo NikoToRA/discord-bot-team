@@ -27,7 +27,7 @@ REACTION_EMOJIS = {
 
 # ChatGPT設定
 CHATGPT_CONFIG = {
-    'vision_model': 'gpt-4-vision-preview',
+    'vision_model': 'gpt-4o',
     'text_model': 'gpt-4',
     'max_tokens': 1000,
     'max_message_length': 1900,
