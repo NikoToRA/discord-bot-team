@@ -36,14 +36,22 @@ async def get_chatgpt_response(user_message):
 
 async def handle_chatgpt_conversation(message):
     """ChatGPTとのテキスト会話処理"""
+    from config import BOT_CONFIG
+
     # コマンドまたは空のメッセージはスキップ
     if not message.content or message.content.startswith('!'):
         return False
 
-    # 特定のキーワードでChatGPT応答をトリガー
-    trigger_keywords = ['chatgpt', 'gpt', '質問', 'おしえて', '教えて']
+    # 指定チャンネルのみで動作
+    if message.channel.id != BOT_CONFIG.get('target_channel_id'):
+        return False
+
+    # 特定のキーワードでChatGPT応答をトリガー（テスト用に拡張）
+    trigger_keywords = ['chatgpt', 'gpt', '質問', 'おしえて', '教えて', '会話', '話', 'ai']
     if not any(keyword in message.content.lower() for keyword in trigger_keywords):
         return False
+
+    print(f"[DEBUG] ChatGPTテキスト会話トリガー: {message.content}")
 
     try:
         # ChatGPT応答を取得
