@@ -7,7 +7,7 @@ Discord Bot Configuration
 FEATURES = {
     'basic_greeting': False,        # 無効
     'chatgpt_text': True,           # 有効化
-    'chatgpt_voice': False,         # 無効
+    'chatgpt_voice': True,          # 有効化
     'chatgpt_image_ocr': True,      # 有効
     'room_logging': False,          # 無効
     'guild_info': False,            # 無効

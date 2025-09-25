@@ -16,6 +16,10 @@ async def transcribe_audio_with_whisper(audio_data, filename):
         if not OPENAI_API_KEY:
             return "OpenAI APIキーが設定されていません。"
 
+        # APIキーをクリーンアップ（改行や空白を除去）
+        OPENAI_API_KEY = OPENAI_API_KEY.strip().replace('\n', '').replace(' ', '')
+        print(f"[DEBUG] OpenAI APIキー長 (音声): {len(OPENAI_API_KEY)}")
+
         # OpenAIクライアントを初期化
         client = OpenAI(api_key=OPENAI_API_KEY)
 
@@ -94,9 +98,17 @@ async def handle_voice_transcription(message, bot):
 
 async def auto_add_voice_reaction(message):
     """音声ファイルが添付されたメッセージに自動で🎤リアクションを追加"""
+    from config import BOT_CONFIG
+
+    # 指定チャンネルのみで動作
+    if message.channel.id != BOT_CONFIG.get('target_channel_id'):
+        print(f"[DEBUG] 音声処理対象外チャンネル: {message.channel.id} != {BOT_CONFIG.get('target_channel_id')}")
+        return False
+
     if message.attachments:
         for attachment in message.attachments:
             if any(attachment.filename.lower().endswith(ext) for ext in ['.mp3', '.wav', '.ogg', '.m4a', '.flac']):
+                print(f"[DEBUG] 🎤リアクション追加: {attachment.filename}")
                 await message.add_reaction(REACTION_EMOJIS['voice_transcribe'])
                 return True
     return False
